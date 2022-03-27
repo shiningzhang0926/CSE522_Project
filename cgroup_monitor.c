@@ -109,7 +109,7 @@ int main(int argc, char** argv) {
     // Sample input: ./resmanager -M xx -U [K,M,G] ./test_program
     // Currently argc = 6
     if (argc == 6) {
-        // TODO: Correct number of args. and check is the last argument (./test_program) is valid?
+        // TODO: Correct number of args. and check is the last argument:./test_program is valid?
     }
     else {
         printf("Incorrect number of arguments are given. Exit.\n");
