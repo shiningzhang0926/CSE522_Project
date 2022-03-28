@@ -37,7 +37,7 @@ void main(void *arg) {
 
     /* Create the child in new namespace(s) */
 
-    mid_wrapper = clone(childFunc, child_stack + STACK_SIZE,
+    mid_wrapper = clone(mid_wrapper, child_stack + STACK_SIZE,
                       flags | SIGCHLD, &args);
     if (mid_wrapper == -1)
         errExit("clone");
