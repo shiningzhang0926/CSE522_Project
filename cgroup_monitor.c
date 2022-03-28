@@ -1,3 +1,8 @@
+#define _GNU_SOURCE
+
+#include <sched.h>
+// #include <linux/sched.h>    /* Definition of struct clone_args */
+
 #include <sys/inotify.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -8,10 +13,14 @@
 #include <signal.h>
 #include <errno.h>
 #include <fcntl.h>
-#define BUF_LEN 4096
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <string.h>
+
+#include <sys/syscall.h>    /* Definition of SYS_* constants */
+#include <unistd.h>
+#define BUF_LEN 4096
+#include "mid_wrapper.h"
 
 #define STACK_SIZE (1024 * 1024)
 static char wrapper_stack[STACK_SIZE];
@@ -164,14 +173,14 @@ int main(int argc, char** argv) {
     int check;
     int pid = getpid();
     memset(dirname, '\0', 128);
-    strcat(dirname, "/sys/fs/cgroup/cgroup_");
+    strcat(dirname, "/sys/fs/cgroup/resmanager_cgroup_");
     sprintf(temp, "%d/", pid);
     strcat(dirname, temp);
     
     // make a new cgroup directory
     check = mkdir(dirname,0777);
     if (!check){
-        printf("The directory cgroup_%d created\n", pid);
+        printf("The directory resmanager_%d created\n", pid);
     }  
     else {
         perror("Unable to create new cgroup directory\n");
@@ -203,21 +212,21 @@ int main(int argc, char** argv) {
     ///////////////////////////////////////////
     /* Create the wrapper and put it into the procs */
     ///////////////////////////////////////////
-    pid_t mid_wrapper;
+    pid_t mid_wrapper_pid;
     struct wrapper_args args;
-    args.argv = argv[optind]; // TODO: chage to the correct argv. @shining
+    args.argv = &argv[optind]; // TODO: chage to the correct argv. @shining
     if (pipe(args.pipe_fd) == -1)
         errExit("pipe");
 
 
     /* Create the child in new namespace(s) */
 
-    mid_wrapper = clone(mid_wrapper, child_stack + STACK_SIZE,
-                      flags | SIGCHLD, &args);
-    if (mid_wrapper == -1)
+    mid_wrapper_pid = clone(mid_wrapper, wrapper_stack + STACK_SIZE,
+                       SIGCHLD, &args);
+    if (mid_wrapper_pid == -1)
         errExit("clone");
 
-    printf("%s: PID of wrapper created by clone() is %ld\n", argv[0], (long) mid_wrapper);
+    printf("%s: PID of wrapper created by clone() is %ld\n", argv[0], (long) mid_wrapper_pid);
 
     // TODO: Put the pid of the child into the cgroup.procs
     char *cgroup_path = dirname;
@@ -227,21 +236,41 @@ int main(int argc, char** argv) {
 
     size_t cgroup_path_len = 128;
     char buf_path_cgroup_proc[cgroup_path_len];
-    int suppose_write = snprintf(buf_path_cgroup_proc, cgroup_path_len, "%s/%s\n", cgroup_path, cgroup_procs);
+    int suppose_write = snprintf(buf_path_cgroup_proc, cgroup_path_len, "%s%s\n", cgroup_path, cgroup_procs);
     if (suppose_write > cgroup_path_len) {
         // TODO: handle if the file path is too long...
     }
     else {
+        printf("Write PID %lu of wrapper into %s\n", (long) mid_wrapper_pid, buf_path_cgroup_proc);
+        sleep(3);
         // Write the PID into the cgroup.procs
-        FILE *fptr = fopen(buf_path_cgroup_proc, "w");
-        fprintf(fptr, "%ld", (long) mid_wrapper);
-        fclose(fptr);
-    }
+        // FILE *fptr = fopen(buf_path_cgroup_proc, "w");
+        // fprintf(fptr, "%lu", (long) mid_wrapper_pid);  
 
+        char pid_write[256];
+        // sprintf(pid_write, "%lu", mid_wrapper_pid);
+        // char* command = "echo";
+        // char* argument_list[] = {"echo", pid_write, ">", buf_path_cgroup_proc, NULL};
+        // int status_code = execvp(command, argument_list);
+ 
+        // if (status_code == -1) {
+        //     printf("Process did not terminate correctly\n");
+        //     exit(1);
+        // }
+
+        sprintf(pid_write, "echo %lu > %s", mid_wrapper_pid, buf_path_cgroup_proc);
+        
+
+        system(pid_write);
+        // fclose(fptr);
+    }
+    printf("Finish writing PID %lu of wrapper into %s\n", (long) mid_wrapper_pid, buf_path_cgroup_proc);
     // TODO: initialize the inotify
 
     // Close the write end of the pipe, to signal to the mid_wrapper
     close(args.pipe_fd[1]);
+
+    printf("Pipe closed\n");
 
 
     // TODO: Remove the cgroup directory we created when this program ends or users type ctrl+c

@@ -1,6 +1,8 @@
 #ifndef __MID_WRAPPER__
 #define __MID_WRAPPER__
 
+#define errExit(msg)    do { perror(msg); exit(EXIT_FAILURE); \
+                        } while (0)
 
 #include <unistd.h>
 #include <stdio.h>
@@ -12,7 +14,7 @@ struct wrapper_args {
     int    pipe_fd[2];  /* Pipe used to synchronize parent and child */
 };
 
-void mid_wrapper(void *arg);
+int mid_wrapper(void *arg);
 
 
 

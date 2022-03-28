@@ -5,7 +5,9 @@
 int main()
 {
     while(1) {
-        int *some_memory = malloc(4*1024); // 4KB
+        printf("I am fork bomb\n");
+        int *some_memory = malloc(1*1024); // 4KB
+        
         sleep(1);
         fork();   
         
