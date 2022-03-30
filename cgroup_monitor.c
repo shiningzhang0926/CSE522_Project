@@ -23,8 +23,10 @@
 
 static char wrapper_stack[STACK_SIZE];
 static char *cgroup_dirname;
+int num_exceed = 0;
 
 static void print_needed_info(int index, int fd) {
+    printf("index %d, fd: %d\n", index, fd);
     char buf[1024] = {'\0'};
     char info_buf[1024] = {'\0'};
     char *begin, *end;
@@ -32,16 +34,10 @@ static void print_needed_info(int index, int fd) {
         perror("Failed to read from file.");
         exit (EXIT_FAILURE);
     }
+    lseek(fd, 0, SEEK_SET);
+    // printf("buf: %s", buf);
     
-
     if (index == 0) {
-        begin = buf;
-        end = strchr(buf, '\n');
-        size_t len_info = end - begin + 1;
-        strncpy(info_buf, begin, len_info);
-        printf("%s", info_buf);
-    }
-    else if (index == 1) {
         begin = strchr(buf, '\n') + 1;
         end = strchr(begin, '\n');
         size_t len_info = end - begin + 1;
@@ -49,7 +45,39 @@ static void print_needed_info(int index, int fd) {
         printf("%s", info_buf);
     }
     lseek(fd, 0, SEEK_SET);
+    printf("index %d\n", index);
 }
+
+// static void inotify_event_handler(int fd, char **filenames, int *fds, int *wds) {
+//     char buf[BUF_LEN] __attribute__((aligned(__alignof__(struct inotify_event)))); 
+//     ssize_t len, i = 0;
+    
+
+//     /* read BUF_LEN bytes' worth of events */ 
+//     len = read (fd, buf, BUF_LEN);
+
+//     /* loop over every read event until none remain */ 
+//     while (i < len) {
+//         struct inotify_event *event = (struct inotify_event *) &buf[i];
+//         printf ("wd=%d mask=0x%x cookie=%d len=%d ", event->wd, event->mask, event->cookie, event->len);
+
+//         /* if there is a name, print it */ 
+//         if (event->len) printf ("name=%s\n", event->name);
+//         else printf("\n");
+        
+//         for (int k = 0; k < 2; k ++) {
+//             if (event->wd == wds[k]) {
+//                 printf("%s\t changed\n", filenames[k]);
+//                 print_needed_info(k, fds[k]);
+//                 break;
+//             }
+//         }
+            
+//         i += sizeof (struct inotify_event) + event->len;
+
+//     }
+// }
+
 
 static void inotify_event_handler(int fd, char **filenames, int *fds, int *wds) {
     char buf[BUF_LEN] __attribute__((aligned(__alignof__(struct inotify_event)))); 
@@ -68,8 +96,64 @@ static void inotify_event_handler(int fd, char **filenames, int *fds, int *wds) 
         if (event->len) printf ("name=%s\n", event->name);
         else printf("\n");
         
-        for (int k = 0; k < 2; k ++) {
+        for (int k = 0; k < 1; k ++) {
             if (event->wd == wds[k]) {
+                // printf("1\n");
+                // char dirname[128];
+                // char temp[128];
+                // int check;
+                // int pid = getpid();
+                // memset(dirname, '\0', 128);
+                // strcat(dirname, "/sys/fs/cgroup/resmanager_cgroup_");
+                // sprintf(temp, "%d/", pid);
+                // strcat(dirname, temp);
+                // printf("2\n");
+                //Open and read from memory.events 
+                char path[128];
+                FILE *fp_event;
+                memset(path, '\0', 128);
+                strcat(path, cgroup_dirname);
+                strcat(path, "memory.events");
+                // printf("3\n");
+                fp_event = fopen(path, "r+");
+                // printf("4\n");
+                printf("%s\n", path);
+
+                //acquire value of high in memory.events
+                char buf[1024] = {'\0'};
+                char info_buf[1024] = {'\0'};
+                if (read(fds[k], buf, 1024) < 0) {
+                    perror("Failed to read from file.");
+                    exit (EXIT_FAILURE);
+                }
+                lseek(fds[k], 0, SEEK_SET);
+                // printf("%s", buf);
+                char *begin, *end;
+                begin = strchr(buf, '\n') + 5;
+                end = strchr(begin, '\n');
+                size_t len_info = end - begin + 1;
+                strncpy(info_buf, begin, len_info);
+                // printf("info_buf: %s", info_buf);
+                printf("5\n");
+                //freeze processes
+                int high_count = atoi(info_buf);
+                printf("high_count[out]: %d, num_exceed: %d\n", high_count, num_exceed);
+                if (high_count > num_exceed){
+                    printf("high_count[in]: %d\n", high_count);
+                    // char state[] = "FROZEN";
+                    // FILE *fp_freeze;
+                    char freeze_path[128];
+                    memset(freeze_path, '\0', 128);
+                    // cgroup_dirname
+                    strcat(freeze_path, cgroup_dirname);
+                    strcat(freeze_path, "cgroup.freeze");
+
+                    char pid_write[256];
+                    sprintf(pid_write, "echo %d > %s", 1, freeze_path);
+                    system(pid_write);
+                    num_exceed = high_count;
+                }
+
                 printf("%s\t changed\n", filenames[k]);
                 print_needed_info(k, fds[k]);
                 break;
@@ -81,11 +165,12 @@ static void inotify_event_handler(int fd, char **filenames, int *fds, int *wds) 
     }
 }
 
+
 static int add_to_watch(int fd_inotify, char* pathname, char **filenames, int *fds) {
     int ret;
     char buf[128];
 
-    for (int i = 0; i < 2; i++) {
+    for (int i = 0; i < 1; i++) {
         memset(buf, '\0', 128);
         strcat(buf, pathname);
         strcat(buf, filenames[i]);
@@ -116,7 +201,7 @@ static void usage(char *pname) {
 static void remove_cgroup_folder() {
     struct stat s;
     while (stat(cgroup_dirname, &s) == 0) {
-        sleep(0.1);
+        usleep(1*1000*1000);
         #ifdef __DEBUG__
         printf("[DEBUG: remove_cgroup_folder] Trying to remove cgroup dir: %s\n", cgroup_dirname);
         #endif
@@ -215,22 +300,29 @@ int main(int argc, char** argv) {
     // Set resource limits (in memory) what is high and max
 
     // Open the memory.high file
-    int high = max * 0.8;
+    int high = max - 4096;
     char path[128];
     FILE *fp_high;
     memset(path, '\0', 128);
     strcat(path, dirname);
     strcat(path, "memory.high");
-    fp_high = fopen(path, "r+");
-    fprintf(fp_high, "%d", high);
+    // fp_high = fopen(path, "w");
+    // fprintf(fp_high, "%d", high);
+    char mem_high_write[256];
+    sprintf(mem_high_write, "echo %d > %s", high, path);
+    system(mem_high_write);
 
     // Open the memory.max file
     FILE *fp_max;
     memset(path, '\0', 128);
     strcat(path, dirname);
     strcat(path, "memory.max");
-    fp_max = fopen(path, "r+");
-    fprintf(fp_max, "%d", max);
+    // fp_max = fopen(path, "w");
+    // fprintf(fp_max, "%d", max);
+    char mem_max_write[256];
+    sprintf(mem_max_write, "echo %d > %s", max, path);
+    system(mem_max_write);
+    
     
     printf("Initialize resouce limit successfully\n");
 
@@ -277,7 +369,55 @@ int main(int argc, char** argv) {
         system(pid_write);
     }
     printf("Finish writing PID %lu of wrapper into %s\n", (long) mid_wrapper_pid, buf_path_cgroup_proc);
+
+    /////////////////////////////////////////////////////////////////////////////
     // TODO: initialize the inotify
+    /////////////////////////////////////////////////////////////////////////////
+
+    int fd_inotify;
+    fd_inotify = inotify_init1(0);
+    if (fd_inotify < 0) {
+        perror("A watch could not be added for the command line argument that was given");
+        exit (EXIT_FAILURE);
+    }
+    printf("inotify_init1() is initialized successfully with file descriptor value %d.\n", fd_inotify);
+
+    // Add the cgroup files in the folder given in the argument to the inotify.
+    char *file_names[1] = {"memory.events"};
+    int cgroup_file_fds[1];
+    int cgroup_file_inotify_fds[1];
+
+    for (int i = 0; i < 1; i++) {
+        memset(buf, '\0', 128);
+        strcat(buf, dirname);
+        strcat(buf, file_names[i]);
+        printf("Opening file %s\n", buf);
+        int fd = open(buf, O_RDONLY); 
+        if (fd < 0) {
+            perror("Failed to open file");
+            exit(EXIT_FAILURE); 
+        }
+        cgroup_file_fds[i] = fd;
+
+        print_needed_info(1, fd);
+    }
+
+
+    add_to_watch(fd_inotify, cgroup_dirname, file_names, cgroup_file_inotify_fds);
+    //for (int i = 0; i < 2; i++) {
+    //    printf("filename: %s, inotify_fd: %d\n", file_names[i], cgroup_file_inotify_fds[i]);
+    //}
+
+    nfds = 1;
+    struct pollfd fds[20];
+
+    fds[0].fd = fd_inotify;                 /* Inotify input */
+    fds[0].events = POLLIN;
+
+
+    
+
+
 
     /////////////////////////////////////////////////////////////////////////////
     // Close the write end of the pipe so that the mid_wrapper can start the
@@ -286,34 +426,93 @@ int main(int argc, char** argv) {
     printf("Program starts ... \n");
     close(args.pipe_fd[1]);
 
+
+    int waitpid_status, waitpid_status_temp;
+    pid_t w, w_temp;
+    while (1) {
+        w_temp = waitpid(-1, &waitpid_status_temp, WNOHANG);
+        if (w_temp == -1) {
+            printf("pid %d\n", w_temp);
+            break;
+        }
+        w = w_temp;
+        waitpid_status = waitpid_status_temp;
+
+        poll_num = poll(fds, nfds, 0.5);
+        if (poll_num == -1) {
+            if (errno == EINTR)
+                continue;
+            perror("poll");
+            exit(EXIT_FAILURE);
+        }
+
+        if (poll_num > 0) {
+            printf("poll_num > 0\n");
+            if (fds[0].revents & POLLIN) {
+                inotify_event_handler(fd_inotify, file_names, cgroup_file_fds, cgroup_file_inotify_fds);
+            }
+        }
+         // TODO: if the test prog is frozen, we do something...
+    }
+
     /////////////////////////////////////////////////////////////////////////////
     // Wait for the child process to finish and report the return value or 
     // errors from the child.
     /////////////////////////////////////////////////////////////////////////////
-    int status;
+    printf("out of while\n");
+    sleep(0.1);
     do {
-            pid_t w = waitpid(mid_wrapper_pid, &status, WUNTRACED | WCONTINUED);
+            // pid_t w = waitpid(mid_wrapper_pid, &waitpid_status, WUNTRACED | WCONTINUED);
             if (w == -1) {
                 perror("waitpid");
                 exit(EXIT_FAILURE);
             }
-           if (WIFEXITED(status)) {
+           if (WIFEXITED(waitpid_status)) {
                 printf("[ResManager] ");
-                printf("Program (%s) exited, status=%d\n", args.argv[0], WEXITSTATUS(status));
-            } else if (WIFSIGNALED(status)) {
+                printf("Program (%s) exited, status=%d\n", args.argv[0], WEXITSTATUS(waitpid_status));
+            } else if (WIFSIGNALED(waitpid_status)) {
                 printf("[ResManager] ");
-                printf("Program (%s) killed by signal %d\n", args.argv[0], WTERMSIG(status));
-            } else if (WIFSTOPPED(status)) {
+                printf("Program (%s) killed by signal %d\n", args.argv[0], WTERMSIG(waitpid_status));
+            } else if (WIFSTOPPED(waitpid_status)) {
                 printf("[ResManager] ");
-                printf("Program (%s) stopped by signal %d\n", args.argv[0], WSTOPSIG(status));
-            } else if (WIFCONTINUED(status)) {
+                printf("Program (%s) stopped by signal %d\n", args.argv[0], WSTOPSIG(waitpid_status));
+            } else if (WIFCONTINUED(waitpid_status)) {
                 printf("[ResManager] ");
                 printf("Program (%s) continued\n", args.argv[0]);
             }
-    } while (!WIFEXITED(status) && !WIFSIGNALED(status));
+    } while (!WIFEXITED(waitpid_status) && !WIFSIGNALED(waitpid_status));
     
 
+    char pid_write[256];
+    char kill_path[128];
+    memset(kill_path, '\0', 128);
+    // cgroup_dirname
+    strcat(kill_path, cgroup_dirname);
+    strcat(kill_path, "cgroup.freeze");
+    sprintf(pid_write, "echo %d > %s", 1, kill_path);
+    sleep(1);
 
+    // TODO: make sure actually frozen.
+
+    memset(kill_path, '\0', 128);
+    strcat(kill_path, cgroup_dirname);
+    strcat(kill_path, "cgroup.procs");
+
+    FILE* file = fopen (kill_path, "r");
+    int i = 0;
+
+    fscanf (file, "%d", &i);    
+    while (!feof (file))
+    {  
+        printf ("Kill: %d \n", i);
+        char pid_write[256];
+        sprintf(pid_write, "kill %d", i);
+        system(pid_write);
+        fscanf (file, "%d", &i);      
+    }
+    fclose (file);  
+
+    system(pid_write);
 
     /////////////////////////////////////////////////////////////////////////////
     // Remove the cgroup directory we created when this program endsRemove it 

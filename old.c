@@ -72,7 +72,7 @@ static int add_to_watch(int fd_inotify, char* pathname, char **filenames, int *f
     int ret;
     char buf[128];
 
-    for (int i = 0; i < 2; i++) {
+    for (int i = 0; i < 1; i++) {
         memset(buf, '\0', 128);
         strcat(buf, pathname);
         strcat(buf, filenames[i]);

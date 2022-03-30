@@ -2,21 +2,22 @@
 #include <unistd.h>
 #include <stdlib.h>
 
-#define NUM_ALLOC 30
+#define NUM_ALLOC 50
 
 int main()
 {
-    int *memory_list[NUM_ALLOC];
+    char *memory_list[NUM_ALLOC];
     int i = 0;
     for (i = 0; i < NUM_ALLOC; i++) {
         printf("Allocate #%d\n", i);
-        memory_list[i] = malloc(4*1024); // 4KB
-        sleep(1);
+        memory_list[i] = (char*) malloc(4*1024); // 4KB
+        usleep(0.2*1000*1000);
     }
 
     printf("Allocation completed. Begin to free memory.\n");
-
+    i--;
     for (; i>=0; i--) {
+        printf("i: %d, %x\n", i, memory_list[i]);
         free(memory_list[i]);
     }
 
