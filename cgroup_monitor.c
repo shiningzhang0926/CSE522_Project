@@ -378,8 +378,8 @@ int main(int argc, char** argv) {
     // //    printf("filename: %s, inotify_fd: %d\n", file_names[i], cgroup_file_inotify_fds[i]);
     // //}
 
-    // nfds = 1;
-    // struct pollfd fds[2];
+    nfds = 1;
+    struct pollfd fds[2];
 
     // // // fds[0].fd = STDIN_FILENO;       /* Console input */
     // // // fds[0].events = POLLIN;
@@ -398,23 +398,23 @@ int main(int argc, char** argv) {
     // //     // TODO: if the test program is not enabled...
     // //     // enable the test program here.
 
-    //     poll_num = poll(fds, nfds, -1);
-    //     if (poll_num == -1) {
-    //         if (errno == EINTR)
-    //             continue;
-    //         perror("poll");
-    //         exit(EXIT_FAILURE);
-    //     }
+        poll_num = poll(fds, nfds, -1);
+        if (poll_num == -1) {
+            if (errno == EINTR)
+                continue;
+            perror("poll");
+            exit(EXIT_FAILURE);
+        }
 
-    //     if (poll_num > 0) {
-    //         if (fds[0].revents & POLLIN) {
-    //             inotify_event_handler(fd_inotify, file_names, cgroup_file_fds, cgroup_file_inotify_fds);
-    //         }
-    //     }
+        if (poll_num > 0) {
+            if (fds[0].revents & POLLIN) {
+                inotify_event_handler(fd_inotify, file_names, cgroup_file_fds, cgroup_file_inotify_fds);
+            }
+        }
 
     // //     // TODO: if the test prog is frozen, we do something...
     // }
 
-    // close(fd_inotify);
-    // exit(EXIT_SUCCESS);
+    close(fd_inotify);
+    exit(EXIT_SUCCESS);
 }
