@@ -13,6 +13,7 @@
                         } while (0)
 
 int mid_wrapper(void *arg) {
+    printf("[DEBUG: mid_wrapper] wrapper pid: %ld\n", (long) getpid());
     struct wrapper_args *args = (struct wrapper_args *) arg;
     char ch;
     // TODO: Wait for the parent to put the pid of this process into the cgroup
@@ -24,6 +25,7 @@ int mid_wrapper(void *arg) {
     // TODO: Make sure that the cgroup is in frozen state
 
     // TODO: Eecute the program
+    printf("[DEBUG: mid_wrapper] execvp.\n");
     execvp(args->argv[0], args->argv);
     errExit("execvp");
 }

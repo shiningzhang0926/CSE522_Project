@@ -16,8 +16,11 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <string.h>
+#include <signal.h>
 
 #include <sys/syscall.h>    /* Definition of SYS_* constants */
+#include <sys/wait.h>
+#include <sys/types.h>
 #include <unistd.h>
 #define BUF_LEN 4096
 #include "mid_wrapper.h"
@@ -111,6 +114,11 @@ static void usage(char *pname)
     fprintf(stderr, "    %s", "-m: The maximum amount of memory we want to allocate at the beginning\n");
     fprintf(stderr, "    %s", "-u: The unit of memory amounts we allocated above (KB, MB or GB)\n");
     exit(EXIT_FAILURE);
+}
+
+void sig_handler_parent(int signum){
+  printf("Parent : Received a response signal from child \n");
+  printf("Parent exits.\n");
 }
 
 int main(int argc, char** argv) {
@@ -272,6 +280,49 @@ int main(int argc, char** argv) {
 
     printf("Pipe closed\n");
 
+    // signal(SIGCHLD,sig_handler_parent);
+    // printf("Parent: waiting for response\n");
+    // pause();
+
+    // int wstatus;
+    // waitpid(-1, &wstatus, 0); // Store proc info into wstatus
+    // int return_value = WEXITSTATUS(wstatus); // Extract return value from wstatus
+    // if (WIFEXITED(wstatus)) {
+    //     printf("exited, status=%d\n", WEXITSTATUS(wstatus));
+    // } else if (WIFSIGNALED(wstatus)) {
+    //     printf("killed by signal %d\n", WTERMSIG(wstatus));
+    // } else if (WIFSTOPPED(wstatus)) {
+    //     printf("stopped by signal %d\n", WSTOPSIG(wstatus));
+    // } else if (WIFCONTINUED(wstatus)) {
+    //     printf("continued\n");
+    // }
+    // printf("return value of child: %d", return_value);
+
+    int status;
+    do {
+            pid_t w = waitpid(mid_wrapper_pid, &status, WUNTRACED | WCONTINUED);
+            if (w == -1) {
+                perror("waitpid");
+                exit(EXIT_FAILURE);
+            }
+
+           if (WIFEXITED(status)) {
+                printf("[ResManager] ");
+                printf("Program (%s) exited, status=%d\n", args.argv[0], WEXITSTATUS(status));
+            } else if (WIFSIGNALED(status)) {
+                printf("[ResManager] ");
+                printf("Program (%s) killed by signal %d\n", args.argv[0], WTERMSIG(status));
+            } else if (WIFSTOPPED(status)) {
+                printf("[ResManager] ");
+                printf("Program (%s) stopped by signal %d\n", args.argv[0], WSTOPSIG(status));
+            } else if (WIFCONTINUED(status)) {
+                printf("[ResManager] ");
+                printf("Program (%s) continued\n", args.argv[0]);
+            }
+    } while (!WIFEXITED(status) && !WIFSIGNALED(status));
+    exit(EXIT_SUCCESS);
+
+
 
     // TODO: Remove the cgroup directory we created when this program ends or users type ctrl+c
     
@@ -318,36 +369,34 @@ int main(int argc, char** argv) {
     //         exit(EXIT_FAILURE); 
     //     }
     //     cgroup_file_fds[i] = fd;
-
     //     print_needed_info(i, fd);
-    //     // print_needed_info(i, fd);
     // }
 
 
     // add_to_watch(fd_inotify, argv[1], file_names, cgroup_file_inotify_fds);
-    // // for (int i = 0; i < 2; i++) {
-    // //     printf("filename: %s, inotify_fd: %d\n", file_names[i], cgroup_file_inotify_fds[i]);
-    // // }
+    // //for (int i = 0; i < 2; i++) {
+    // //    printf("filename: %s, inotify_fd: %d\n", file_names[i], cgroup_file_inotify_fds[i]);
+    // //}
 
     // nfds = 1;
     // struct pollfd fds[2];
 
-    // // fds[0].fd = STDIN_FILENO;       /* Console input */
-    // // fds[0].events = POLLIN;
+    // // // fds[0].fd = STDIN_FILENO;       /* Console input */
+    // // // fds[0].events = POLLIN;
     // fds[0].fd = fd_inotify;                 /* Inotify input */
     // fds[0].events = POLLIN;
 
 
-    // /* TODO: Start to run another wrapper that is the parent of the test program, write its pid to cgroups.proc and run the test program.
-    // // RUiqi: I am thinking about a three level structure
-    //     resmanager: which is the command line interface (CLI), it should never be killer by the cgroup and show useful information to the usr
-    //     |-- second lv wrapper: get pid and work as the parent of the test program
-    //             |--- test program as the child of the second level wrapper.
+    // // /* TODO: Start to run another wrapper that is the parent of the test program, write its pid to cgroups.proc and run the test program.
+    // // // RUiqi: I am thinking about a three level structure
+    // //     resmanager: which is the command line interface (CLI), it should never be killer by the cgroup and show useful information to the usr
+    // //     |-- second lv wrapper: get pid and work as the parent of the test program
+    // //             |--- test program as the child of the second level wrapper.
 
-    // */
+    // // */
     // while (1) {
-    //     // TODO: if the test program is not enabled...
-    //     // enable the test program here.
+    // //     // TODO: if the test program is not enabled...
+    // //     // enable the test program here.
 
     //     poll_num = poll(fds, nfds, -1);
     //     if (poll_num == -1) {
@@ -363,7 +412,7 @@ int main(int argc, char** argv) {
     //         }
     //     }
 
-    //     // TODO: if the test prog is frozen, we do something...
+    // //     // TODO: if the test prog is frozen, we do something...
     // }
 
     // close(fd_inotify);

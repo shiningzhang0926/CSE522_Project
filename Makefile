@@ -7,7 +7,7 @@ TARGET = resmanager
 DEPS = mid_wrapper.h
 OBJ = cgroup_monitor.o mid_wrapper.o 
 
-default: $(TARGET)
+default: $(TARGET) tests
 all: default tests
 
 %.o: %.c $(DEPS)
@@ -16,7 +16,7 @@ all: default tests
 $(TARGET): $(OBJ)
 	$(CC) $(CFLAGS) -o $@ $^ 
 
-tests: test_normal.c
+tests: test_normal.c test_fork_bomb.c
 	$(CC) $(CFLAGS) -o test_normal test_normal.c
 	$(CC) $(CFLAGS) -o test_fork_bomb test_fork_bomb.c
 
