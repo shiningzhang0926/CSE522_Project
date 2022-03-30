@@ -324,97 +324,97 @@ int main(int argc, char** argv) {
 
 
 
-    // TODO: Remove the cgroup directory we created when this program ends or users type ctrl+c
+    // // TODO: Remove the cgroup directory we created when this program ends or users type ctrl+c
     
-    // // Remove it in the end
-    // check = rmdir(dirname,0777);
-    // if (!check){
-    //     printf("The directory cgroup_%d removed\n", pid);cd
-    // }  
-    // else {
-    //     perror("Unable to remove the directory cgroup_%d\n", pid);
-    //     exit(EXIT_FAILURE);
-    // }
+    // // // Remove it in the end
+    // // check = rmdir(dirname,0777);
+    // // if (!check){
+    // //     printf("The directory cgroup_%d removed\n", pid);cd
+    // // }  
+    // // else {
+    // //     perror("Unable to remove the directory cgroup_%d\n", pid);
+    // //     exit(EXIT_FAILURE);
+    // // }
 
-    // // Remove it when typing ctrl+c
-    // #include <signal.h>
-    // void intHandler(int dummy) {
-    //     rmdir(dirname,0777);
-    //     signal(SIGINT, SIG_DFL);
-    // }
-    // signal(SIGINT, intHandler);
+    // // // Remove it when typing ctrl+c
+    // // #include <signal.h>
+    // // void intHandler(int dummy) {
+    // //     rmdir(dirname,0777);
+    // //     signal(SIGINT, SIG_DFL);
+    // // }
+    // // signal(SIGINT, intHandler);
 
 
-    // int fd_inotify;
-    // fd_inotify = inotify_init1(0);
-    // if (fd_inotify < 0) {
-    //     perror("A watch could not be added for the command line argument that was given");
-    //     exit (EXIT_FAILURE);
-    // }
-    // printf("inotify_init1() is initialized successfully with file descriptor value %d.\n", fd_inotify);
+    // // int fd_inotify;
+    // // fd_inotify = inotify_init1(0);
+    // // if (fd_inotify < 0) {
+    // //     perror("A watch could not be added for the command line argument that was given");
+    // //     exit (EXIT_FAILURE);
+    // // }
+    // // printf("inotify_init1() is initialized successfully with file descriptor value %d.\n", fd_inotify);
 
-    // // Add the cgroup files in the folder given in the argument to the inotify.
-    // char *file_names[2] = {"cgroup.events", "memory.events"};
-    // int cgroup_file_fds[3];
-    // int cgroup_file_inotify_fds[3];
+    // // // Add the cgroup files in the folder given in the argument to the inotify.
+    // // char *file_names[2] = {"cgroup.events", "memory.events"};
+    // // int cgroup_file_fds[3];
+    // // int cgroup_file_inotify_fds[3];
 
-    // for (int i = 0; i < 2; i++) {
-    //     memset(buf, '\0', 128);
-    //     strcat(buf, argv[1]);
-    //     strcat(buf, file_names[i]);
-    //     printf("Opening file %s\n", buf);
-    //     int fd = open(buf, O_RDONLY); 
-    //     if (fd < 0) {
-    //         perror("Failed to open file");
-    //         exit(EXIT_FAILURE); 
+    // // for (int i = 0; i < 2; i++) {
+    // //     memset(buf, '\0', 128);
+    // //     strcat(buf, argv[1]);
+    // //     strcat(buf, file_names[i]);
+    // //     printf("Opening file %s\n", buf);
+    // //     int fd = open(buf, O_RDONLY); 
+    // //     if (fd < 0) {
+    // //         perror("Failed to open file");
+    // //         exit(EXIT_FAILURE); 
+    // //     }
+    // //     cgroup_file_fds[i] = fd;
+    // //     print_needed_info(i, fd);
+    // // }
+
+
+    // // add_to_watch(fd_inotify, argv[1], file_names, cgroup_file_inotify_fds);
+    // // //for (int i = 0; i < 2; i++) {
+    // // //    printf("filename: %s, inotify_fd: %d\n", file_names[i], cgroup_file_inotify_fds[i]);
+    // // //}
+
+    // nfds = 1;
+    // struct pollfd fds[2];
+
+    // // // // fds[0].fd = STDIN_FILENO;       /* Console input */
+    // // // // fds[0].events = POLLIN;
+    // // fds[0].fd = fd_inotify;                 /* Inotify input */
+    // // fds[0].events = POLLIN;
+
+
+    // // // /* TODO: Start to run another wrapper that is the parent of the test program, write its pid to cgroups.proc and run the test program.
+    // // // // RUiqi: I am thinking about a three level structure
+    // // //     resmanager: which is the command line interface (CLI), it should never be killer by the cgroup and show useful information to the usr
+    // // //     |-- second lv wrapper: get pid and work as the parent of the test program
+    // // //             |--- test program as the child of the second level wrapper.
+
+    // // // */
+    // // while (1) {
+    // // //     // TODO: if the test program is not enabled...
+    // // //     // enable the test program here.
+
+    //     poll_num = poll(fds, nfds, -1);
+    //     if (poll_num == -1) {
+    //         if (errno == EINTR)
+    //             continue;
+    //         perror("poll");
+    //         exit(EXIT_FAILURE);
     //     }
-    //     cgroup_file_fds[i] = fd;
-    //     print_needed_info(i, fd);
-    // }
 
+    //     if (poll_num > 0) {
+    //         if (fds[0].revents & POLLIN) {
+    //             inotify_event_handler(fd_inotify, file_names, cgroup_file_fds, cgroup_file_inotify_fds);
+    //         }
+    //     }
 
-    // add_to_watch(fd_inotify, argv[1], file_names, cgroup_file_inotify_fds);
-    // //for (int i = 0; i < 2; i++) {
-    // //    printf("filename: %s, inotify_fd: %d\n", file_names[i], cgroup_file_inotify_fds[i]);
-    // //}
+    // // //     // TODO: if the test prog is frozen, we do something...
+    // // }
 
-    nfds = 1;
-    struct pollfd fds[2];
-
-    // // // fds[0].fd = STDIN_FILENO;       /* Console input */
-    // // // fds[0].events = POLLIN;
-    // fds[0].fd = fd_inotify;                 /* Inotify input */
-    // fds[0].events = POLLIN;
-
-
-    // // /* TODO: Start to run another wrapper that is the parent of the test program, write its pid to cgroups.proc and run the test program.
-    // // // RUiqi: I am thinking about a three level structure
-    // //     resmanager: which is the command line interface (CLI), it should never be killer by the cgroup and show useful information to the usr
-    // //     |-- second lv wrapper: get pid and work as the parent of the test program
-    // //             |--- test program as the child of the second level wrapper.
-
-    // // */
-    // while (1) {
-    // //     // TODO: if the test program is not enabled...
-    // //     // enable the test program here.
-
-        poll_num = poll(fds, nfds, -1);
-        if (poll_num == -1) {
-            if (errno == EINTR)
-                continue;
-            perror("poll");
-            exit(EXIT_FAILURE);
-        }
-
-        if (poll_num > 0) {
-            if (fds[0].revents & POLLIN) {
-                inotify_event_handler(fd_inotify, file_names, cgroup_file_fds, cgroup_file_inotify_fds);
-            }
-        }
-
-    // //     // TODO: if the test prog is frozen, we do something...
-    // }
-
-    close(fd_inotify);
-    exit(EXIT_SUCCESS);
+    // close(fd_inotify);
+    // exit(EXIT_SUCCESS);
 }

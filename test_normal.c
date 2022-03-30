@@ -12,7 +12,7 @@ int main(int argc, char** argv)
     printf("[DEBUG: %s] test pid: %ld\n", argv[0], (long) getpid());
     for (int i = 0; i < 5; i++) {
         printf("count: %d\n", i);
-        sleep(0.5);
+        sleep(1);
     }
     // raise(SIGSEGV);
     // int a = 4/0;
