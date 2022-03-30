@@ -24,6 +24,7 @@
 
 #define STACK_SIZE (1024 * 1024)
 static char wrapper_stack[STACK_SIZE];
+int num_exceed = 0;
 
 static void print_needed_info(int index, int fd) {
     char buf[1024] = {'\0'};
@@ -34,7 +35,6 @@ static void print_needed_info(int index, int fd) {
         exit (EXIT_FAILURE);
     }
     
-
     if (index == 0) {
         begin = buf;
         end = strchr(buf, '\n');
@@ -71,6 +71,45 @@ static void inotify_event_handler(int fd, char **filenames, int *fds, int *wds) 
         
         for (int k = 0; k < 2; k ++) {
             if (event->wd == wds[k]) {
+
+                char dirname[128];
+                char temp[128];
+                int check;
+                int pid = getpid();
+                memset(dirname, '\0', 128);
+                strcat(dirname, "/sys/fs/cgroup/resmanager_cgroup_");
+                sprintf(temp, "%d/", pid);
+                strcat(dirname, temp);
+
+                //Open and read from memory.events 
+                char path[128];
+                FILE *fp_event;
+                memset(path, '\0', 128);
+                strcat(path, dirname);
+                strcat(path, "memory.events");
+    `           fp_event = fopen(path, "r+");
+
+                //acquire value of high in memory.events
+                char buf[1024] = {'\0'};
+                char info_buf[1024] = {'\0'};
+                char *begin, *end;
+                begin = strchr(buf, '\n') + 5;
+                end = strchr(begin, '\n');
+                size_t len_info = end - begin + 1;
+                strncpy(info_buf, begin, len_info);
+
+                //freeze processes
+                if (info_buf > num_exceed){
+                    char state[] = "FROZEN";
+                    FILE *fp_freeze;
+                    memset(path, '\0', 128);
+                    strcat(path, "/sys/fs/cgroup/0/");
+                    strcat(path, "freezer.state");
+                    fp_freeze = fopen(path, "r+");
+                    fprintf(fp_freeze, "%s", state);
+                    num_exceed++;
+                }
+
                 printf("%s\t changed\n", filenames[k]);
                 print_needed_info(k, fds[k]);
                 break;
@@ -309,7 +348,7 @@ int main(int argc, char** argv) {
 
     for (int i = 0; i < 2; i++) {
         memset(buf, '\0', 128);
-        strcat(buf, argv[1]);
+        strcat(buf, dirname);
         strcat(buf, file_names[i]);
         printf("Opening file %s\n", buf);
         int fd = open(buf, O_RDONLY); 
@@ -323,13 +362,13 @@ int main(int argc, char** argv) {
     }
 
 
-    add_to_watch(fd_inotify, argv[1], file_names, cgroup_file_inotify_fds);
+    add_to_watch(fd_inotify, argv[5], file_names, cgroup_file_inotify_fds);
     //for (int i = 0; i < 2; i++) {
     //    printf("filename: %s, inotify_fd: %d\n", file_names[i], cgroup_file_inotify_fds[i]);
     //}
 
     nfds = 1;
-    struct pollfd fds[2];
+    struct pollfd fds[20];
 
     // // fds[0].fd = STDIN_FILENO;       /* Console input */
     // // fds[0].events = POLLIN;
@@ -361,9 +400,8 @@ int main(int argc, char** argv) {
                 inotify_event_handler(fd_inotify, file_names, cgroup_file_fds, cgroup_file_inotify_fds);
             }
         }
-
-    //     // TODO: if the test prog is frozen, we do something...
-    // }
+         // TODO: if the test prog is frozen, we do something...
+    }
 
     close(fd_inotify);
     exit(EXIT_SUCCESS);
