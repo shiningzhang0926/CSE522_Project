@@ -1,6 +1,7 @@
 #ifndef __MID_WRAPPER__
 #define __MID_WRAPPER__
 
+#define __DEBUG__
 #define errExit(msg)    do { perror(msg); exit(EXIT_FAILURE); \
                         } while (0)
 
