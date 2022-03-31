@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string.h>
 #include <unistd.h>
 #include <stdlib.h>
 
@@ -8,9 +9,11 @@ int main()
 {
     char *memory_list[NUM_ALLOC];
     int i = 0;
+    int num_KB = 40;
     for (i = 0; i < NUM_ALLOC; i++) {
-        printf("Allocate #%d\n", i);
-        memory_list[i] = (char*) malloc(4*1024); // 4KB
+        printf("Allocate #%d %dKB\n", i, num_KB);
+        memory_list[i] = (char*) malloc(num_KB*1024); // 4KB
+        memset(memory_list[i] , '1', num_KB*1024);
         usleep(0.2*1000*1000);
     }
 

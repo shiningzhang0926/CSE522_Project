@@ -14,7 +14,7 @@
 
 int mid_wrapper(void *arg) {
     #ifdef __DEBUG__ 
-    printf("[DEBUG: mid_wrapper] wrapper pid: %ld\n", (long) getpid());
+    debug_printf("[DEBUG: mid_wrapper] wrapper pid: %ld\n", (long) getpid());
     #endif
     struct wrapper_args *args = (struct wrapper_args *) arg;
     char ch;
@@ -28,7 +28,7 @@ int mid_wrapper(void *arg) {
 
     // TODO: Eecute the program
     #ifdef __DEBUG__ 
-    printf("[DEBUG: mid_wrapper] execvp.\n");
+    debug_printf("%s", "[DEBUG: mid_wrapper] execvp.\n");
     #endif
     execvp(args->argv[0], args->argv);
     errExit("execvp");

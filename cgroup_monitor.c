@@ -21,13 +21,18 @@
 #define BUF_LEN 4096
 #define STACK_SIZE (1024 * 1024)
 
+
 static char wrapper_stack[STACK_SIZE];
-static char *cgroup_dirname;
+
 static char *human_readable_suffix = "kMG";
 int num_exceed = 0;
 
+static char *cgroup_dirname;
+// static char *cgroup_dirname;
+
+
 static void print_needed_info(int index, int fd) {
-    printf("index %d, fd: %d\n", index, fd);
+    debug_printf("print_needed_info: index %d, fd: %d\n", index, fd);
     char buf[1024] = {'\0'};
     char info_buf[1024] = {'\0'};
     char *begin, *end;
@@ -43,42 +48,11 @@ static void print_needed_info(int index, int fd) {
         end = strchr(begin, '\n');
         size_t len_info = end - begin + 1;
         strncpy(info_buf, begin, len_info);
-        printf("%s", info_buf);
+        debug_printf("%s", info_buf);
     }
     lseek(fd, 0, SEEK_SET);
-    printf("index %d\n", index);
+    // printf("index %d\n", index);
 }
-
-// static void inotify_event_handler(int fd, char **filenames, int *fds, int *wds) {
-//     char buf[BUF_LEN] __attribute__((aligned(__alignof__(struct inotify_event)))); 
-//     ssize_t len, i = 0;
-    
-
-//     /* read BUF_LEN bytes' worth of events */ 
-//     len = read (fd, buf, BUF_LEN);
-
-//     /* loop over every read event until none remain */ 
-//     while (i < len) {
-//         struct inotify_event *event = (struct inotify_event *) &buf[i];
-//         printf ("wd=%d mask=0x%x cookie=%d len=%d ", event->wd, event->mask, event->cookie, event->len);
-
-//         /* if there is a name, print it */ 
-//         if (event->len) printf ("name=%s\n", event->name);
-//         else printf("\n");
-        
-//         for (int k = 0; k < 2; k ++) {
-//             if (event->wd == wds[k]) {
-//                 printf("%s\t changed\n", filenames[k]);
-//                 print_needed_info(k, fds[k]);
-//                 break;
-//             }
-//         }
-            
-//         i += sizeof (struct inotify_event) + event->len;
-
-//     }
-// }
-
 
 static void inotify_event_handler(int fd, char **filenames, int *fds, int *wds) {
     char buf[BUF_LEN] __attribute__((aligned(__alignof__(struct inotify_event)))); 
@@ -91,34 +65,22 @@ static void inotify_event_handler(int fd, char **filenames, int *fds, int *wds) 
     /* loop over every read event until none remain */ 
     while (i < len) {
         struct inotify_event *event = (struct inotify_event *) &buf[i];
-        printf ("wd=%d mask=0x%x cookie=%d len=%d ", event->wd, event->mask, event->cookie, event->len);
+        debug_printf("wd=%d mask=0x%x cookie=%d len=%d ", event->wd, event->mask, event->cookie, event->len);
 
         /* if there is a name, print it */ 
         if (event->len) printf ("name=%s\n", event->name);
-        else printf("\n");
+        else debug_printf("\n", 1);
         
         for (int k = 0; k < 1; k ++) {
             if (event->wd == wds[k]) {
-                // printf("1\n");
-                // char dirname[128];
-                // char temp[128];
-                // int check;
-                // int pid = getpid();
-                // memset(dirname, '\0', 128);
-                // strcat(dirname, "/sys/fs/cgroup/resmanager_cgroup_");
-                // sprintf(temp, "%d/", pid);
-                // strcat(dirname, temp);
-                // printf("2\n");
                 //Open and read from memory.events 
                 char path[128];
                 FILE *fp_event;
                 memset(path, '\0', 128);
                 strcat(path, cgroup_dirname);
                 strcat(path, "memory.events");
-                // printf("3\n");
                 fp_event = fopen(path, "r+");
-                // printf("4\n");
-                printf("%s\n", path);
+                debug_printf("%s\n", path);
 
                 //acquire value of high in memory.events
                 char buf[1024] = {'\0'};
@@ -135,12 +97,12 @@ static void inotify_event_handler(int fd, char **filenames, int *fds, int *wds) 
                 size_t len_info = end - begin + 1;
                 strncpy(info_buf, begin, len_info);
                 // printf("info_buf: %s", info_buf);
-                printf("5\n");
+                // debug_printf("5\n");
                 //freeze processes
                 int high_count = atoi(info_buf);
-                printf("high_count[out]: %d, num_exceed: %d\n", high_count, num_exceed);
+                debug_printf("high_count[out]: %d, num_exceed: %d\n", high_count, num_exceed);
                 if (high_count > num_exceed){
-                    printf("high_count[in]: %d\n", high_count);
+                    debug_printf("high_count[in]: %d\n", high_count);
                     // char state[] = "FROZEN";
                     // FILE *fp_freeze;
                     if (1) { // current > high
@@ -155,11 +117,19 @@ static void inotify_event_handler(int fd, char **filenames, int *fds, int *wds) 
                         system(pid_write);
                     }
                     num_exceed = high_count;
+
+                    debug_printf("%s\t changed\n", filenames[k]);
+                    print_needed_info(k, fds[k]);
+                    printf( "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n");
+                    printf( "|Warning: Exceeded memory.high. Proceed with 1 of the 3 options:                  |\n"
+                            "|1. Give a new memory.max: num[k,M,G], e.g., 20k, 30M                             |\n"
+                            "|2. Proceed:   Type \"continue\"                                                    |\n"
+                            "|3. Terminate: Type \"kill\"                                                        |\n"
+                            "|Please note: Proceeding without adding additional memory is not recommended.     |\n");
+                    printf( "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n");
                 }
 
-                printf("%s\t changed\n", filenames[k]);
-                print_needed_info(k, fds[k]);
-                printf("Warning: Exceeded memory.high. Proceed with 1 of the 3 options: \n 1. Give a new memory.high: num [k,M,G]\n 2. Proceed: continue\n 3. Terminate: kill\nPlease note: Proceeding without adding additional memory is not recommended.\n");
+                
                 break;
             }
         }
@@ -185,7 +155,7 @@ static int add_to_watch(int fd_inotify, char* pathname, char **filenames, int *f
             return EXIT_FAILURE;
         }
         fds[i] = ret;
-        printf("inotify_add_watch() on %s is successful with fd %d.\n", buf, ret);
+        debug_printf("inotify_add_watch() on %s is successful with fd %d.\n", buf, ret);
     }
 
     return EXIT_SUCCESS;
@@ -207,7 +177,7 @@ static void remove_cgroup_folder() {
     while (stat(cgroup_dirname, &s) == 0) {
         usleep(1*1000*1000);
         #ifdef __DEBUG__
-        printf("[DEBUG: remove_cgroup_folder] Trying to remove cgroup dir: %s\n", cgroup_dirname);
+        debug_printf("[DEBUG: remove_cgroup_folder] Trying to remove cgroup dir: %s\n", cgroup_dirname);
         #endif
         rmdir(cgroup_dirname);
     }
@@ -215,7 +185,8 @@ static void remove_cgroup_folder() {
 
 static void intHandler(int dummy) {
     remove_cgroup_folder();
-    printf("Ctrl+C input from user, exit.\n");
+    printf("\n[ResManager] Ctrl+C input from user\n");
+    printf("[ResManager] ResManager exits.\n");
     exit(EXIT_SUCCESS);
 }
 
@@ -237,6 +208,8 @@ size_t *parse_human_readable(char *input, size_t *target) {
         shift = (match - human_readable_suffix + 1) * 10;
 
     *target = value * (1LU << shift);
+
+    debug_printf("In parse: target = %d\n", *target);
 
     return target;
 }
@@ -284,7 +257,7 @@ int main(int argc, char** argv) {
                 usage(argv[0]);
                 exit(EXIT_FAILURE);
             }
-            printf("max = %d bytes from the inputs\n", max);
+            printf("User allocated max = %d bytes from the inputs\n", max);
             flag++; 
             break;
         default: usage(argv[0]);
@@ -296,25 +269,46 @@ int main(int argc, char** argv) {
         usage(argv[0]);
         exit(EXIT_FAILURE);
     }
-    
+
+    /////////////////////////////////////////////
     // Set the path of our new cgroup
+    /////////////////////////////////////////////
     char dirname[128];
     char temp[128];
+    char cgroup_memory_high_path[128];
+    char cgroup_memory_max_path[128];
     int check;
     int pid = getpid();
     memset(dirname, '\0', 128);
     strcat(dirname, "/sys/fs/cgroup/resmanager_cgroup_");
     sprintf(temp, "%d/", pid);
     strcat(dirname, temp);
-    signal(SIGINT, intHandler);
 
+    cgroup_dirname = dirname;
+    char freeze_path[128], procs_path[128];
+    memset(freeze_path, '\0', 128);
+    strcat(freeze_path, cgroup_dirname);
+    strcat(freeze_path, "cgroup.freeze");
+
+    memset(procs_path, '\0', 128);
+    strcat(procs_path, cgroup_dirname);
+    strcat(procs_path, "cgroup.procs");
+
+    memset(cgroup_memory_high_path, '\0', 128);
+    strcat(cgroup_memory_high_path, cgroup_dirname);
+    strcat(cgroup_memory_high_path, "memory.high");
+
+    memset(cgroup_memory_max_path, '\0', 128);
+    strcat(cgroup_memory_max_path, cgroup_dirname);
+    strcat(cgroup_memory_max_path, "memory.max");
 
     /////////////////////////////////////////////
     // make a new cgroup directory
     /////////////////////////////////////////////
-    check = mkdir(dirname,0777);
+    signal(SIGINT, intHandler);
+    check = mkdir(cgroup_dirname,0777);
     if (!check) {
-        printf("The directory resmanager_%d created\n", pid);
+        debug_printf("The directory resmanager_%d created\n", pid);
     }  
     else {
         perror("Unable to create new cgroup directory\n");
@@ -325,25 +319,11 @@ int main(int argc, char** argv) {
 
     // Open the memory.high file
     int high = max - 4096;
-    char cgroup_memory_high_path[128];
-    char cgroup_memory_max_path[128];
-    FILE *fp_high;
-    memset(cgroup_memory_high_path, '\0', 128);
-    strcat(cgroup_memory_high_path, dirname);
-    strcat(cgroup_memory_high_path, "memory.high");
-    // fp_high = fopen(path, "w");
-    // fprintf(fp_high, "%d", high);
+    
     char mem_high_write[256];
     sprintf(mem_high_write, "echo %d > %s", high, cgroup_memory_high_path);
     system(mem_high_write);
 
-    // Open the memory.max file
-    // FILE *fp_max;
-    memset(cgroup_memory_max_path, '\0', 128);
-    strcat(cgroup_memory_max_path, dirname);
-    strcat(cgroup_memory_max_path, "memory.max");
-    // fp_max = fopen(path, "w");
-    // fprintf(fp_max, "%d", max);
     char mem_max_write[256];
     sprintf(mem_max_write, "echo %d > %s", max, cgroup_memory_max_path);
     system(mem_max_write);
@@ -372,10 +352,10 @@ int main(int argc, char** argv) {
         errExit("clone");
     }
 
-    printf("%s: PID of wrapper created by clone() is %ld\n", argv[0], (long) mid_wrapper_pid);
+    debug_printf("%s: PID of wrapper created by clone() is %ld\n", argv[0], (long) mid_wrapper_pid);
 
     // Put the pid of the child into the cgroup.procs
-    cgroup_dirname = dirname;
+    
     char *cgroup_procs = "cgroup.procs";
     char *cgroup_memory_max = "memory.max";
     char *cgroup_memory_stat = "memory.stat";
@@ -387,13 +367,13 @@ int main(int argc, char** argv) {
         // TODO: handle if the file path is too long...
     }
     else {
-        printf("Write PID %lu of wrapper into %s\n", (long) mid_wrapper_pid, buf_path_cgroup_proc);
+        debug_printf("Write PID %lu of wrapper into %s\n", (long) mid_wrapper_pid, buf_path_cgroup_proc);
         sleep(2);
         char pid_write[256];
         sprintf(pid_write, "echo %lu > %s", mid_wrapper_pid, buf_path_cgroup_proc);
         system(pid_write);
     }
-    printf("Finish writing PID %lu of wrapper into %s\n", (long) mid_wrapper_pid, buf_path_cgroup_proc);
+    debug_printf("Finish writing PID %lu of wrapper into %s\n", (long) mid_wrapper_pid, buf_path_cgroup_proc);
 
     /////////////////////////////////////////////////////////////////////////////
     // TODO: initialize the inotify
@@ -405,7 +385,7 @@ int main(int argc, char** argv) {
         perror("A watch could not be added for the command line argument that was given");
         exit (EXIT_FAILURE);
     }
-    printf("inotify_init1() is initialized successfully with file descriptor value %d.\n", fd_inotify);
+    debug_printf("inotify_init1() is initialized successfully with file descriptor value %d.\n", fd_inotify);
 
     // Add the cgroup files in the folder given in the argument to the inotify.
     char *file_names[1] = {"memory.events"};
@@ -414,16 +394,15 @@ int main(int argc, char** argv) {
 
     for (int i = 0; i < 1; i++) {
         memset(buf, '\0', 128);
-        strcat(buf, dirname);
+        strcat(buf, cgroup_dirname);
         strcat(buf, file_names[i]);
-        printf("Opening file %s\n", buf);
+        debug_printf("Opening file %s\n", buf);
         int fd = open(buf, O_RDONLY); 
         if (fd < 0) {
             perror("Failed to open file");
             exit(EXIT_FAILURE); 
         }
         cgroup_file_fds[i] = fd;
-
         print_needed_info(1, fd);
     }
 
@@ -447,7 +426,7 @@ int main(int argc, char** argv) {
     // Close the write end of the pipe so that the mid_wrapper can start the
     // the program.
     /////////////////////////////////////////////////////////////////////////////
-    printf("Program starts ... \n");
+    printf("Program starts ... \n\nvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv\n");
     close(args.pipe_fd[1]);
 
 
@@ -458,7 +437,7 @@ int main(int argc, char** argv) {
     while (1) {
         w_temp = waitpid(-1, &waitpid_status_temp, WNOHANG);
         if (w_temp == -1) {
-            printf("pid %d\n", w_temp);
+            debug_printf("pid %d\n", w_temp);
             break;
         }
         w = w_temp;
@@ -475,48 +454,34 @@ int main(int argc, char** argv) {
         if (poll_num > 0) {
             // printf("poll_num > 0\n");
             if (fds[0].revents & POLLIN & isContinue == 0) {
-                printf("poll 0\n");
+                debug_printf("%s", "poll 0\n");
                 inotify_event_handler(fd_inotify, file_names, cgroup_file_fds, cgroup_file_inotify_fds);
             }
-            if (fds[1].revents & POLLIN){
-                printf("poll 1\n");
+            else if (fds[1].revents & POLLIN){
+                debug_printf("%s", "poll 1\n");
                 int num_read = read(STDIN_FILENO, buff, 1024);
                 if (num_read == 1024) {
                 // something to warn the user...
                 }
                 buff[strcspn(buff,"\n")] = '\0';
                 printf("User input: %s\n",buff);
-                
-                // cont --> ;
-                // allo --> handler
-                //kill --> kill
-
-                
 
                 // TODO: make sure actually frozen.
-                size_t result;
+                size_t new_max;
 
-                if (!strcmp(buff, "kill")){ //strcmp
+                if (strcmp(buff, "kill") == 0){ //strcmp
+                    debug_printf("%s", "User choose to kill\n");
                     char pid_write[256];
-                    char kill_path[128];
-                    memset(kill_path, '\0', 128);
-                    // cgroup_dirname
-                    strcat(kill_path, cgroup_dirname);
-                    strcat(kill_path, "cgroup.freeze");
-                    sprintf(pid_write, "echo %d > %s", 1, kill_path);
-                    sleep(1);
+                    sprintf(pid_write, "echo %d > %s", 1, freeze_path);
+                    sleep(0.1);
 
-                    memset(kill_path, '\0', 128);
-                    strcat(kill_path, cgroup_dirname);
-                    strcat(kill_path, "cgroup.procs");
-
-                    FILE* file = fopen (kill_path, "r");
+                    FILE* file = fopen (procs_path, "r");
                     int i = 0;
 
                     fscanf (file, "%d", &i);    
                     while (!feof (file))
                     {  
-                        printf ("Kill: %d \n", i);
+                        debug_printf("Kill: %d \n", i);
                         char pid_write[256];
                         sprintf(pid_write, "kill %d", i);
                         system(pid_write);
@@ -526,15 +491,16 @@ int main(int argc, char** argv) {
                     system(pid_write);
                     break;
                 }
-                else if (!strcmp(buff, "continue")){
+                else if (strcmp(buff, "continue") == 0){
+                    debug_printf("%s", "User choose to continue\n");
                     //printf("Continuing process");
                     //unfreeze cgroup and proceed as is
                     isContinue = 1;
-                    char freeze_path[128];
-                    memset(freeze_path, '\0', 128);
-                    // cgroup_dirname
-                    strcat(freeze_path, cgroup_dirname);
-                    strcat(freeze_path, "cgroup.freeze");
+                    // char freeze_path[128];
+                    // memset(freeze_path, '\0', 128);
+                    // // cgroup_dirname
+                    // strcat(freeze_path, cgroup_dirname);
+                    // strcat(freeze_path, "cgroup.freeze");
 
                     char pid_write[256];
                     sprintf(pid_write, "echo %d > %s", 0, freeze_path);
@@ -542,31 +508,27 @@ int main(int argc, char** argv) {
                     continue;
                 }
                 
-                else if(parse_human_readable(buff, &result)){
+                else if(parse_human_readable(buff, &new_max)){
+                    debug_printf("%s", "User choose to allocate\n");
                     //Check if inputted value is greater than initial memory.max
-                    char info_buf[1024];
-                    FILE *mem_max = fopen(cgroup_memory_max_path, "r");
-                    if(mem_max == NULL){
+                    int curr_cgroup_memory_max_val = -1;
+                    FILE *cgroup_memory_max_path_fptr = fopen(cgroup_memory_max_path, "r");
+                    if(cgroup_memory_max_path_fptr == NULL){
                         printf("Error! Could not open file\n");
                     }
-                    fscanf(mem_max, "%d", info_buf);
-                    int new_max = atoi(info_buf);
-                    if(new_max > result){
-                        printf("Entered");
-                        max = result;
+                    fscanf(cgroup_memory_max_path_fptr, "%d", &curr_cgroup_memory_max_val);
+                    // int new_max = atoi(info_buf);
+                    printf("New Max: %d, Orignal Max: %d\n", new_max, curr_cgroup_memory_max_val);
+                    if(new_max > curr_cgroup_memory_max_val){
+                        // printf("Entered");
+                        max = new_max;
                         high = max - 4096;
                         
-                        printf("Max:%d High:%d Result:%d", max, high, result);
+                        printf("New memory constraints: Max:%d, High:%d\n", max, high);
                         sprintf(mem_high_write, "echo %d > %s", high, cgroup_memory_high_path);
                         system(mem_high_write);
                         sprintf(mem_max_write, "echo %d > %s", max, cgroup_memory_max_path);
                         system(mem_max_write);
-
-                        char freeze_path[128];
-                        memset(freeze_path, '\0', 128);
-                        // cgroup_dirname
-                        strcat(freeze_path, cgroup_dirname);
-                        strcat(freeze_path, "cgroup.freeze");
 
                         char pid_write[256];
                         sprintf(pid_write, "echo %d > %s", 0, freeze_path);
@@ -589,7 +551,9 @@ int main(int argc, char** argv) {
     // Wait for the child process to finish and report the return value or 
     // errors from the child.
     /////////////////////////////////////////////////////////////////////////////
-    printf("out of while\n");
+    #ifdef __DEBUG__
+    debug_printf("%s", "out of while\n");
+    #endif
     sleep(0.1);
     do {
             // pid_t w = waitpid(mid_wrapper_pid, &waitpid_status, WUNTRACED | WCONTINUED);
@@ -622,7 +586,10 @@ int main(int argc, char** argv) {
     // in the end
     /////////////////////////////////////////////////////////////////////////////
     remove_cgroup_folder();
-    printf("The directory %s removed\n", cgroup_dirname);
+    // #ifdef __DEBUG__
+    debug_printf("The directory %s removed\n", cgroup_dirname);
+    // #endif
+    printf("[ResManager] ResManager exits.\n");
     exit(EXIT_SUCCESS);
 
 }
