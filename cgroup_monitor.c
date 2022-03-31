@@ -23,6 +23,7 @@
 
 static char wrapper_stack[STACK_SIZE];
 static char *cgroup_dirname;
+static char *human_readable_suffix = "kMG";
 int num_exceed = 0;
 
 static void print_needed_info(int index, int fd) {
@@ -142,20 +143,23 @@ static void inotify_event_handler(int fd, char **filenames, int *fds, int *wds) 
                     printf("high_count[in]: %d\n", high_count);
                     // char state[] = "FROZEN";
                     // FILE *fp_freeze;
-                    char freeze_path[128];
-                    memset(freeze_path, '\0', 128);
-                    // cgroup_dirname
-                    strcat(freeze_path, cgroup_dirname);
-                    strcat(freeze_path, "cgroup.freeze");
+                    if (1) { // current > high
+                        char freeze_path[128];
+                        memset(freeze_path, '\0', 128);
+                        // cgroup_dirname
+                        strcat(freeze_path, cgroup_dirname);
+                        strcat(freeze_path, "cgroup.freeze");
 
-                    char pid_write[256];
-                    sprintf(pid_write, "echo %d > %s", 1, freeze_path);
-                    system(pid_write);
+                        char pid_write[256];
+                        sprintf(pid_write, "echo %d > %s", 1, freeze_path);
+                        system(pid_write);
+                    }
                     num_exceed = high_count;
                 }
 
                 printf("%s\t changed\n", filenames[k]);
                 print_needed_info(k, fds[k]);
+                printf("Warning: Exceeded memory.high. Proceed with 1 of the 3 options: \n 1. Give a new memory.high: num [k,M,G]\n 2. Proceed: continue\n 3. Terminate: kill\nPlease note: Proceeding without adding additional memory is not recommended.\n");
                 break;
             }
         }
@@ -215,7 +219,27 @@ static void intHandler(int dummy) {
     exit(EXIT_SUCCESS);
 }
 
+//Check proper input for memory
+size_t *parse_human_readable(char *input, size_t *target) {
+    char *endp = input;
+    char *match = NULL;
+    size_t shift = 0;
+    errno = 0;
 
+    long double value = strtold(input, &endp);
+    if(errno || endp == input || value < 0)
+        return NULL;
+
+    if(!(match = strchr(human_readable_suffix, *endp)))
+        return NULL;
+
+    if(*match)
+        shift = (match - human_readable_suffix + 1) * 10;
+
+    *target = value * (1LU << shift);
+
+    return target;
+}
 
 
 int main(int argc, char** argv) {
@@ -301,26 +325,27 @@ int main(int argc, char** argv) {
 
     // Open the memory.high file
     int high = max - 4096;
-    char path[128];
+    char cgroup_memory_high_path[128];
+    char cgroup_memory_max_path[128];
     FILE *fp_high;
-    memset(path, '\0', 128);
-    strcat(path, dirname);
-    strcat(path, "memory.high");
+    memset(cgroup_memory_high_path, '\0', 128);
+    strcat(cgroup_memory_high_path, dirname);
+    strcat(cgroup_memory_high_path, "memory.high");
     // fp_high = fopen(path, "w");
     // fprintf(fp_high, "%d", high);
     char mem_high_write[256];
-    sprintf(mem_high_write, "echo %d > %s", high, path);
+    sprintf(mem_high_write, "echo %d > %s", high, cgroup_memory_high_path);
     system(mem_high_write);
 
     // Open the memory.max file
-    FILE *fp_max;
-    memset(path, '\0', 128);
-    strcat(path, dirname);
-    strcat(path, "memory.max");
+    // FILE *fp_max;
+    memset(cgroup_memory_max_path, '\0', 128);
+    strcat(cgroup_memory_max_path, dirname);
+    strcat(cgroup_memory_max_path, "memory.max");
     // fp_max = fopen(path, "w");
     // fprintf(fp_max, "%d", max);
     char mem_max_write[256];
-    sprintf(mem_max_write, "echo %d > %s", max, path);
+    sprintf(mem_max_write, "echo %d > %s", max, cgroup_memory_max_path);
     system(mem_max_write);
     
     
@@ -408,15 +433,14 @@ int main(int argc, char** argv) {
     //    printf("filename: %s, inotify_fd: %d\n", file_names[i], cgroup_file_inotify_fds[i]);
     //}
 
-    nfds = 1;
+    nfds = 2;
     struct pollfd fds[20];
 
     fds[0].fd = fd_inotify;                 /* Inotify input */
     fds[0].events = POLLIN;
 
-
-    
-
+    fds[1].fd = STDIN_FILENO;               /* Console input */
+    fds[1].events = POLLIN;
 
 
     /////////////////////////////////////////////////////////////////////////////
@@ -429,6 +453,8 @@ int main(int argc, char** argv) {
 
     int waitpid_status, waitpid_status_temp;
     pid_t w, w_temp;
+    char *buff;
+    int isContinue = 0;
     while (1) {
         w_temp = waitpid(-1, &waitpid_status_temp, WNOHANG);
         if (w_temp == -1) {
@@ -438,18 +464,122 @@ int main(int argc, char** argv) {
         w = w_temp;
         waitpid_status = waitpid_status_temp;
 
-        poll_num = poll(fds, nfds, 0.5);
+        poll_num = poll(fds, nfds, 1);   
         if (poll_num == -1) {
             if (errno == EINTR)
                 continue;
             perror("poll");
             exit(EXIT_FAILURE);
         }
-
+        
         if (poll_num > 0) {
-            printf("poll_num > 0\n");
-            if (fds[0].revents & POLLIN) {
+            // printf("poll_num > 0\n");
+            if (fds[0].revents & POLLIN & isContinue == 0) {
+                printf("poll 0\n");
                 inotify_event_handler(fd_inotify, file_names, cgroup_file_fds, cgroup_file_inotify_fds);
+            }
+            if (fds[1].revents & POLLIN){
+                printf("poll 1\n");
+                int num_read = read(STDIN_FILENO, buff, 1024);
+                if (num_read == 1024) {
+                // something to warn the user...
+                }
+                buff[strcspn(buff,"\n")] = '\0';
+                printf("User input: %s\n",buff);
+                
+                // cont --> ;
+                // allo --> handler
+                //kill --> kill
+
+                
+
+                // TODO: make sure actually frozen.
+                size_t result;
+
+                if (!strcmp(buff, "kill")){ //strcmp
+                    char pid_write[256];
+                    char kill_path[128];
+                    memset(kill_path, '\0', 128);
+                    // cgroup_dirname
+                    strcat(kill_path, cgroup_dirname);
+                    strcat(kill_path, "cgroup.freeze");
+                    sprintf(pid_write, "echo %d > %s", 1, kill_path);
+                    sleep(1);
+
+                    memset(kill_path, '\0', 128);
+                    strcat(kill_path, cgroup_dirname);
+                    strcat(kill_path, "cgroup.procs");
+
+                    FILE* file = fopen (kill_path, "r");
+                    int i = 0;
+
+                    fscanf (file, "%d", &i);    
+                    while (!feof (file))
+                    {  
+                        printf ("Kill: %d \n", i);
+                        char pid_write[256];
+                        sprintf(pid_write, "kill %d", i);
+                        system(pid_write);
+                        fscanf (file, "%d", &i);      
+                    }
+                    fclose (file);  
+                    system(pid_write);
+                    break;
+                }
+                else if (!strcmp(buff, "continue")){
+                    //printf("Continuing process");
+                    //unfreeze cgroup and proceed as is
+                    isContinue = 1;
+                    char freeze_path[128];
+                    memset(freeze_path, '\0', 128);
+                    // cgroup_dirname
+                    strcat(freeze_path, cgroup_dirname);
+                    strcat(freeze_path, "cgroup.freeze");
+
+                    char pid_write[256];
+                    sprintf(pid_write, "echo %d > %s", 0, freeze_path);
+                    system(pid_write);
+                    continue;
+                }
+                
+                else if(parse_human_readable(buff, &result)){
+                    //Check if inputted value is greater than initial memory.max
+                    char info_buf[1024];
+                    FILE *mem_max = fopen(cgroup_memory_max_path, "r");
+                    if(mem_max == NULL){
+                        printf("Error! Could not open file\n");
+                    }
+                    fscanf(mem_max, "%d", info_buf);
+                    int new_max = atoi(info_buf);
+                    if(new_max > result){
+                        printf("Entered");
+                        max = result;
+                        high = max - 4096;
+                        
+                        printf("Max:%d High:%d Result:%d", max, high, result);
+                        sprintf(mem_high_write, "echo %d > %s", high, cgroup_memory_high_path);
+                        system(mem_high_write);
+                        sprintf(mem_max_write, "echo %d > %s", max, cgroup_memory_max_path);
+                        system(mem_max_write);
+
+                        char freeze_path[128];
+                        memset(freeze_path, '\0', 128);
+                        // cgroup_dirname
+                        strcat(freeze_path, cgroup_dirname);
+                        strcat(freeze_path, "cgroup.freeze");
+
+                        char pid_write[256];
+                        sprintf(pid_write, "echo %d > %s", 0, freeze_path);
+                        system(pid_write);
+                        continue;
+                    }
+                    else{
+                        printf("Inputted memory size smaller than original memory given. Please input a larger value of allocated memory with the structure: num [k,M,G].\n");
+                    }
+                }
+                else{
+                    printf("Please input a valid command. Proceed with 1 of the 3 options: \n 1. Give a new memory.high: num [k,M,G]\n 2. Proceed: continue\n 3. Terminate: kill\nPlease note: Proceeding without adding additional memory is not recommended.\n\n");
+                }
             }
         }
          // TODO: if the test prog is frozen, we do something...
@@ -483,36 +613,9 @@ int main(int argc, char** argv) {
     } while (!WIFEXITED(waitpid_status) && !WIFSIGNALED(waitpid_status));
     
 
-    char pid_write[256];
-    char kill_path[128];
-    memset(kill_path, '\0', 128);
-    // cgroup_dirname
-    strcat(kill_path, cgroup_dirname);
-    strcat(kill_path, "cgroup.freeze");
-    sprintf(pid_write, "echo %d > %s", 1, kill_path);
-    sleep(1);
 
-    // TODO: make sure actually frozen.
-
-    memset(kill_path, '\0', 128);
-    strcat(kill_path, cgroup_dirname);
-    strcat(kill_path, "cgroup.procs");
-
-    FILE* file = fopen (kill_path, "r");
-    int i = 0;
-
-    fscanf (file, "%d", &i);    
-    while (!feof (file))
-    {  
-        printf ("Kill: %d \n", i);
-        char pid_write[256];
-        sprintf(pid_write, "kill %d", i);
-        system(pid_write);
-        fscanf (file, "%d", &i);      
-    }
-    fclose (file);  
-
-    system(pid_write);
+    
+    
 
     /////////////////////////////////////////////////////////////////////////////
     // Remove the cgroup directory we created when this program endsRemove it 
