@@ -23,7 +23,7 @@ cgroup2 on /sys/fs/cgroup type cgroup2 (rw,nosuid,nodev,noexec,relatime,nsdelega
 Otherwise, change you cgroup version to v2.
 
 ### Enable the memory controller in the cgroup.subtree_control
-Issue
+Issue the following command to ensure that the memory controller is enabled in the cgroup controllers.
 ```
 sudo echo "+memory" > cgroup.subtree_control
 ```
