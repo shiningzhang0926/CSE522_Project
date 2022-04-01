@@ -9,6 +9,24 @@ A command-line utility that  will
 
 For our project, we wanted to design a program that would allow us to limit resource utilization of a running process and prevent it from being killed directly by the OOM killer which would result in wasted time and resources from having to rerun the program from the beginning.
 
+## Prerequiste
+
+### Make sure you are using cgroupv2. 
+By issuing,
+```
+mount | grep cgroup
+```
+You should find something like,
+```
+cgroup2 on /sys/fs/cgroup type cgroup2 (rw,nosuid,nodev,noexec,relatime,nsdelegate)
+```
+Otherwise, change you cgroup version to v2.
+
+### Enable the memory controller in the cgroup.subtree_control
+Issue
+```
+echo "+memory" > cgroup.subtree_control
+```
 ## Install
 **Note that you need SUDO permission to run the ResManager**
 
@@ -18,7 +36,7 @@ make clean && make
 ```
 
 
-## Tests
+## Usage and Tests
 
 **Note that you need SUDO permission to run the ResManager**
 
@@ -90,6 +108,9 @@ User input: kill
 [ResManager] Program (./test_increase) killed by signal 16
 [ResManager] ResManager exits.
 ```
+
+### (TODO) 4. Request for statistics
+We will add another option to allow the user to request the current memory usage and print the statistics in the terminal. 
 
 ## Authors
 William Hsaio, Ruiqi Wang, Shining Zhang created for the course project of
