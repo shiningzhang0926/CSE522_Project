@@ -20,11 +20,11 @@ int main()
     printf("Allocation completed. Begin to free memory.\n");
     i--;
     for (; i>=0; i--) {
-        printf("i: %d, %x\n", i, memory_list[i]);
+        // printf("i: %d, %x\n", i, memory_list[i]);
         free(memory_list[i]);
     }
 
-    printf("Memory freed. Program exits.\n");
+    printf("Memory freed. Test Program exits.\n");
 
     return 0;
 }

@@ -5,7 +5,7 @@ CFLAGS=-g
 TARGET = resmanager
 
 DEPS = mid_wrapper.h
-OBJ = cgroup_monitor.o mid_wrapper.o 
+OBJ = resmamager.o mid_wrapper.o 
 
 default: $(TARGET) tests
 all: default tests
