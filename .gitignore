@@ -3,3 +3,4 @@ test_normal
 test_fork_bomb
 test_increase
 resmanager
+.vscode
