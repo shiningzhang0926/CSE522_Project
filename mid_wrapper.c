@@ -1,5 +1,5 @@
 /*
- * mid_wrapper.h
+ * mid_wrapper.c
  * ----------------------------
  * a middle level wrapper to call the user program after the initialization
  * from the resmanager is completed.
