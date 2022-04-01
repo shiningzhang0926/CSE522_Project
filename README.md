@@ -25,7 +25,7 @@ Otherwise, change you cgroup version to v2.
 ### Enable the memory controller in the cgroup.subtree_control
 Issue
 ```
-echo "+memory" > cgroup.subtree_control
+sudo echo "+memory" > cgroup.subtree_control
 ```
 ## Install
 **Note that you need SUDO permission to run the ResManager**
