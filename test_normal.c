@@ -1,11 +1,15 @@
+/*
+ * test_normal.c
+ * ----------------------------
+ * A normal test program with no memory allocation. It will count from 0 to 4.
+ * 
+ * Authors: Ruiqi Wang, Shining Zhang, William Hsaio
+ */
+
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <signal.h>
-
-void sig_handler_child(int signum){
-  
-}
 
 int main(int argc, char** argv)
 {
@@ -14,13 +18,6 @@ int main(int argc, char** argv)
         printf("count: %d\n", i);
         sleep(1);
     }
-    // raise(SIGSEGV);
-    // int a = 4/0;
-    // i[4] = 10;
-    // kill(getppid(),SIGUSR1);
-    // printf("Child: sending siganl to parent\n");
-
     printf("[DEBUG: %s] Child exits.\n", argv[0]);
-
     return 0;
 }

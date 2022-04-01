@@ -1,3 +1,10 @@
+/*
+ * test_increase.c
+ * ----------------------------
+ * A test program that will request memory num_KB for NUM_ALLOC times.
+ * 
+ * Authors: Ruiqi Wang, Shining Zhang, William Hsaio
+ */
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
@@ -17,14 +24,13 @@ int main()
         usleep(0.2*1000*1000);
     }
 
-    printf("Allocation completed. Begin to free memory.\n");
+    printf("[test_increase.c] Allocation completed. Begin to free memory.\n");
     i--;
     for (; i>=0; i--) {
-        // printf("i: %d, %x\n", i, memory_list[i]);
         free(memory_list[i]);
     }
 
-    printf("Memory freed. Test Program exits.\n");
+    printf("[test_increase.c] Memory freed. Test Program exits.\n");
 
     return 0;
 }

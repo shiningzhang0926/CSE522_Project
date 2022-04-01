@@ -1,9 +1,15 @@
+/*
+ * test_fork_bomb.c
+ * ----------------------------
+ * A fork bomb.
+ * 
+ * Authors: Ruiqi Wang, Shining Zhang, William Hsaio
+ */
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
 
-int main()
-{
+int main() {
     while(1) {
         printf("I am fork bomb\n");
         int *some_memory = malloc(4*1024); // 4KB
