@@ -20,7 +20,7 @@ You should find something like,
 ```
 cgroup2 on /sys/fs/cgroup type cgroup2 (rw,nosuid,nodev,noexec,relatime,nsdelegate)
 ```
-Otherwise, change you cgroup version to v2.
+Otherwise, change your cgroup version to v2.
 
 ### Enable the memory controller in the cgroup.subtree_control
 Issue the following command to ensure that the memory controller is enabled in the cgroup controllers.
