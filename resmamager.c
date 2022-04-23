@@ -165,7 +165,7 @@ static void inotify_event_handler(int fd, char **filenames, int *fds, int *wds) 
                     print_needed_info(k, fds[k]);
                     printf( "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n");
                     printf( "|Warning: Exceeded memory.high. Proceed with 1 of the 3 options:                  |\n"
-                            "|1. Give a new memory.max: num[K,M,G], e.g., 20k, 30M                             |\n"
+                            "|1. Give a new memory.max: num[K,M,G], e.g., 20K, 30M                             |\n"
                             "|2. Proceed:   Type \"continue\"                                                    |\n"
                             "|3. Terminate: Type \"kill\"                                                        |\n"
                             "|Please note: Proceeding without adding additional memory is not recommended.     |\n");
@@ -284,7 +284,7 @@ static void user_interrupt_handler(int dummy) {
  * Parse memory size string to actual number in bytes with error checking.
  * 
  * Params: 
- * input: the string that contains memory size info. (e.g., 30k, 40M)
+ * input: the string that contains memory size info. (e.g., 30K, 40M)
  * target: The pointer that will store the parsed size in bytes.
  * 
  * returns: target
@@ -678,7 +678,7 @@ int main(int argc, char** argv) {
                         frozen = 1;
                         printf( "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n");
                         printf( "|Warning: cgroup is frozen. Proceed with 1 of the 3 options:                  |\n"
-                            "|1. Give a new memory.max: num[K,M,G], e.g., 20k, 30M                             |\n"
+                            "|1. Give a new memory.max: num[K,M,G], e.g., 20K, 30M                             |\n"
                             "|2. Proceed:   Type \"continue\"                                                    |\n"
                             "|3. Terminate: Type \"kill\"                                                        |\n"
                             "|Please note: Proceeding without adding additional memory is not recommended.     |\n");

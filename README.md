@@ -65,7 +65,7 @@ The box at the end of the output indicated that the current memory exceeded the 
 
 Now the user has three options to continue the execution:
 ### 1. Allocate more memory
-The user may type a memory size in the format of `num[k,M,G]`, e.g., `20k`, `30M`, and press "Enter" in the terminal to allocate more memory for the `memory.max` (`memory.high` will be adjusted accordingly to the predefined ratio to `memory.max`.). The test program will continue to execute with more memory allocated.
+The user may type a memory size in the format of `num[K,M,G]`, e.g., `20K`, `30M`, and press "Enter" in the terminal to allocate more memory for the `memory.max` (`memory.high` will be adjusted accordingly to the predefined ratio to `memory.max`.). The test program will continue to execute with more memory allocated.
 
 Note that the ResManager may freeze the execution again if the memory exceeds
 the memory.high again. In this case, the box shown above will show again and ask for another user input.
