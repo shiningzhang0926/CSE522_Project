@@ -2,5 +2,6 @@
 test_normal
 test_fork_bomb
 test_increase
+parallel_dense_mm
 resmanager
 .vscode
