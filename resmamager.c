@@ -35,6 +35,7 @@
 #include <string.h>
 #include <signal.h>
 #include <unistd.h>
+#include <pthread.h>
 
 #include "mid_wrapper.h"
 
@@ -42,10 +43,15 @@
 #define STACK_SIZE (1024 * 1024)            // stack size of the child/wrapper.
 static char wrapper_stack[STACK_SIZE];      // the stack of the child/wrapper.
 
-static char *human_readable_suffix = "kMG"; // Units of memory sizes..
+static char *human_readable_suffix = "KMG"; // Units of memory sizes..
 int num_exceed = 0;                         // The last count of high in memory.events.
 static char *cgroup_dirname;                // The path to the cgroup that ResManager created.
+int frozen = 0;
 
+typedef struct{
+    int t;
+    char *path;
+}print_config;                              // The struct for printing the current memory usage
 
 /*
  * Function: print_needed_info
@@ -152,13 +158,14 @@ static void inotify_event_handler(int fd, char **filenames, int *fds, int *wds) 
                     char pid_write[256];
                     sprintf(pid_write, "echo %d > %s", 1, freeze_path);
                     system(pid_write);
+                    frozen = 1;
                     num_exceed = high_count;
 
                     debug_printf("%s\t changed\n", filenames[k]);
                     print_needed_info(k, fds[k]);
                     printf( "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n");
                     printf( "|Warning: Exceeded memory.high. Proceed with 1 of the 3 options:                  |\n"
-                            "|1. Give a new memory.max: num[k,M,G], e.g., 20k, 30M                             |\n"
+                            "|1. Give a new memory.max: num[K,M,G], e.g., 20k, 30M                             |\n"
                             "|2. Proceed:   Type \"continue\"                                                    |\n"
                             "|3. Terminate: Type \"kill\"                                                        |\n"
                             "|Please note: Proceeding without adding additional memory is not recommended.     |\n");
@@ -220,10 +227,12 @@ static int add_to_watch(int fd_inotify, char* pathname, char **filenames, int *w
  * returns: exit the program with EXIT_FAILURE
  */
 static void usage(char *program_name) {
-    fprintf(stderr, "Usage: %s [option] arg1 [option] arg2 ./test_program \n", program_name); 
+    fprintf(stderr, "Usage: %s [option] arg1 [option] arg2 [option] arg3 [option] arg4 ./test_program \n", program_name); 
     fprintf(stderr, "Options should be:\n");
-    fprintf(stderr, "    %s", "-m: The maximum amount of memory we want to allocate at the beginning\n");
-    fprintf(stderr, "    %s", "-u: The unit of memory amounts we allocated above (KB, MB or GB)\n");
+    fprintf(stderr, "    %s", "-m: The maximum amount of memory we want to allocate at the beginning and arg1 should look like xxx[K,M,G]\n");
+    fprintf(stderr, "    %s", "-t: The time interval of printing current memory usage and arg2 should be a number in seconds\n");
+    fprintf(stderr, "    %s", "-w: The weight of cpu we want to set and arg3 should be a number from 1 to 10000\n");
+    fprintf(stderr, "    %s", "-b: The bandwidth of cpu we want to set and arg4 should be a number from 0 to 1\n");
     exit(EXIT_FAILURE);
 }
 
@@ -307,59 +316,100 @@ size_t *parse_human_readable(char *input, size_t *target) {
     return target;
 }
 
+/*
+ * Function: print_current_memory
+ * ----------------------------
+ * It is a function that get a time interval from the user's command line, and
+ * print out the current memory usage of the child process periodically by 
+ * opening, reading and closing the memory.current file.
+ * 
+ * Params:
+ * arg: it's a struct that store the time interval and the path of memory.current
+ * 
+ * returns: none
+ */
+
+void* print_current_memory (void *arg){
+    print_config* config = (print_config*)arg;
+    int fd;
+    int temp = 0;
+    while(1){
+        sleep(config->t);
+        fd = open(config->path, O_RDONLY);
+        char buf[1024];
+        if (read(fd, buf, 1024) < 0) {
+            perror("Failed to read from memory.current.");
+            exit (EXIT_FAILURE);
+        }
+        if(atoi(buf) > temp){
+            printf("Current Memory Usage (bytes): %s", buf);
+            temp = atoi(buf);
+        }
+        close(fd);
+    }
+    
+}
+
 
 int main(int argc, char** argv) {
     char buf[128];
     int nfds, poll_num;
 
-    // Sample input: ./resmanager -M xx -U [K,M,G] ./test_program
-    if (argc == 6) {
-        // TODO: Correct number of args. and check is the last argument:./test_program is valid?
-    }
-    else {
-        printf("Incorrect number of arguments are given. Exit.\n");
-        usage(argv[0]);
-        exit(EXIT_FAILURE);
-    }
-
+    // Sample input: ./resmanager -m xxx[K,M,G](memory.max) -t xxx(secs) -w xxx(cpu.weight) -b xxx(cpu.bandwidth) ./test_program
     
-    int max;
+    size_t max;
+    int t, weight;
+    float bandwidth;
     char* unit;
     int opt; 
     int flag = 0;
+    int memory_usage_flag = 0;
+    int memory_current_flag = 0;
+    int cpu_weight_flag = 0;
+    int cpu_max_flag = 0;
 
-    // Get the inputs from -m and -u options
-    while ((opt = getopt(argc, argv, "+m:u:")) != -1) {
+    // Get the inputs from -m, -t, -w and -b options
+    while ((opt = getopt(argc, argv, "+m:t:w:b:")) != -1) {
         switch (opt) {
-            case 'm': max = atoi(optarg); flag++; break;
-            case 'u': 
-                unit = optarg;
-                // Convert the memory amounts
-                if(memcmp(unit, "KB", 2) == 0) {
-                    max = max * 1024;
-                }
-                else if(memcmp(unit, "MB", 2) == 0) {
-                    max = max * 1024 * 1024;
-                }
-                else if(memcmp(unit, "GB", 2) == 0) {
-                    max = max * 1024 * 1024 * 1024;
+            case 'm':
+                if(parse_human_readable(optarg, &max)){
+                    memory_usage_flag = 1;
+                    break;
                 }
                 else{
-                    printf("The unit of memory isn't correct");
+                    printf("The format of memory isn't correct\n");
                     usage(argv[0]);
                     exit(EXIT_FAILURE);
                 }
-                printf("User allocated max = %d bytes from the inputs\n", max);
-                flag++; 
+            case 't': 
+                t = atoi(optarg); 
+                if (t != 0){
+                    memory_current_flag = 1;
+                }
                 break;
-            default: usage(argv[0]);
+            case 'w':
+                weight = atoi(optarg);
+                if (weight < 1 || weight > 10000){
+                    printf("Warning: CPU's weight only can range from 1-10000\n.");
+                    usage(argv[0]);
+                    exit(EXIT_FAILURE);
+                }
+                cpu_weight_flag = 1;
+                break;
+            case 'b':
+                bandwidth = atof(optarg);
+                if(bandwidth <= 0 || bandwidth > 1){
+                    printf("Warning: CPU's bandwidth only can range from 0-1\n.");
+                    usage(argv[0]);
+                    exit(EXIT_FAILURE);
+                }
+                cpu_max_flag = 1;
         }
     }
 
-    // Check the accuracy of two options
-    if(flag != 2) {
+    // Check whether the user input the command line of executing a test program
+    if(argv[optind] == NULL){
         usage(argv[0]);
-        exit(EXIT_FAILURE);
     }
 
     /////////////////////////////////////////////
@@ -369,6 +419,12 @@ int main(int argc, char** argv) {
     char temp[128];
     char cgroup_memory_high_path[128];
     char cgroup_memory_max_path[128];
+    
+    char cgroup_memory_current_path[128];
+    char cgroup_cpu_stat_path[128];
+    char cgroup_cpu_weight_path[128];
+    char cgroup_cpu_max_path[128];
+
     int check;
     int pid = getpid();
     memset(dirname, '\0', 128);
@@ -394,6 +450,22 @@ int main(int argc, char** argv) {
     strcat(cgroup_memory_max_path, cgroup_dirname);
     strcat(cgroup_memory_max_path, "memory.max");
 
+    memset(cgroup_memory_current_path, '\0', 128);
+    strcat(cgroup_memory_current_path, cgroup_dirname);
+    strcat(cgroup_memory_current_path, "memory.current");
+
+    memset(cgroup_cpu_stat_path, '\0', 128);
+    strcat(cgroup_cpu_stat_path, cgroup_dirname);
+    strcat(cgroup_cpu_stat_path, "cpu.stat");
+
+    memset(cgroup_cpu_weight_path, '\0', 128);
+    strcat(cgroup_cpu_weight_path, cgroup_dirname);
+    strcat(cgroup_cpu_weight_path, "cpu.weight");
+
+    memset(cgroup_cpu_max_path, '\0', 128);
+    strcat(cgroup_cpu_max_path, cgroup_dirname);
+    strcat(cgroup_cpu_max_path, "cpu.max");
+
     /////////////////////////////////////////////
     // create a new cgroup directory
     /////////////////////////////////////////////
@@ -408,20 +480,37 @@ int main(int argc, char** argv) {
     }
 
     /////////////////////////////////////////////////////
-    // Set resource limits (in memory) what is high and max
+    // Set resource limits what is high, max in memory 
+    // and what is weight, bandwidth in cpu
     /////////////////////////////////////////////////////
 
-    // Open the memory.high file
-    int high = (max - 4096) * 0.8;;
-    
+    // Write new values into memory.high, memory.max, cpu.weight and cpu.max files if the user inputs them.
+    int high;
     char mem_high_write[256];
-    sprintf(mem_high_write, "echo %d > %s", high, cgroup_memory_high_path);
-    system(mem_high_write);
-
     char mem_max_write[256];
-    sprintf(mem_max_write, "echo %d > %s", max, cgroup_memory_max_path);
-    system(mem_max_write);
+    char cpu_weight_write[256];
+    char cpu_max_write[256];
     
+    if (memory_usage_flag == 1){
+        high = (max - 4096) * 0.8;;
+        
+        sprintf(mem_high_write, "echo %d > %s", high, cgroup_memory_high_path);
+        system(mem_high_write);
+        sprintf(mem_max_write, "echo %d > %s", max, cgroup_memory_max_path);
+        system(mem_max_write);
+    }
+    
+    if (cpu_weight_flag == 1){      
+        sprintf(cpu_weight_write, "echo %d > %s", weight, cgroup_cpu_weight_path);
+        system(cpu_weight_write);
+    }
+
+    int period = 10000;
+    int m = period * bandwidth;
+    if (cpu_max_flag == 1){
+        sprintf(cpu_max_write, "echo %d %d > %s", max, period, cgroup_cpu_max_path);
+        system(cpu_max_write);
+    }
     
     printf("Initialize resouce limit successfully\n");
 
@@ -430,7 +519,8 @@ int main(int argc, char** argv) {
     /////////////////////////////////////////////////////
     pid_t mid_wrapper_pid;
     struct wrapper_args args;
-    args.argv = &argv[optind];
+    args.argv = &argv[optind];   
+
     if (pipe(args.pipe_fd) == -1) {
         remove_cgroup_folder();
         errExit("pipe");
@@ -461,7 +551,9 @@ int main(int argc, char** argv) {
     char buf_path_cgroup_proc[cgroup_path_len];
     int suppose_write = snprintf(buf_path_cgroup_proc, cgroup_path_len, "%s%s\n", cgroup_dirname, cgroup_procs);
     if (suppose_write > cgroup_path_len) {
-        // TODO: handle if the file path is too long...
+        // Handle if the file path is too long
+        perror("The length of the file path is too long. Please allow longer paths in this program.");
+        exit (EXIT_FAILURE);
     }
     else {
         debug_printf("Write PID %lu of wrapper into %s\n", (long) mid_wrapper_pid, buf_path_cgroup_proc);
@@ -524,13 +616,25 @@ int main(int argc, char** argv) {
 
 
     /////////////////////////////////////////////////////////////////////////////
+    // Create a new thread to print the current memory usgae of this child 
+    // process periodically
+    /////////////////////////////////////////////////////////////////////////////
+    pthread_t tid;
+    print_config config;
+    if(memory_current_flag == 1){
+        config.t = t;
+        config.path = cgroup_memory_current_path;
+        pthread_create(&tid, NULL, &print_current_memory, &config);
+    }
+    
+    /////////////////////////////////////////////////////////////////////////////
     // Check whether the child has returned with waitpid() and monitor user input and 
     // cgroup events with inotify
     /////////////////////////////////////////////////////////////////////////////
 
     int waitpid_status, waitpid_status_temp;
     pid_t w, w_temp;
-    char *buff;
+    char buff[1024];
     int is_continue_no_freeze = 0;
     while (1) {
         w_temp = waitpid(-1, &waitpid_status_temp, WNOHANG); // -1 
@@ -559,80 +663,103 @@ int main(int argc, char** argv) {
                 debug_printf("%s", "poll 1\n");
                 int num_read = read(STDIN_FILENO, buff, 1024);
                 if (num_read == 1024) {
-                    // TODO: The user input is too long. We need to have some error handling to warn the user...
+                    // Error handler to warn the user that his input is too long
+                    printf("Warning: the length of your input is too long. The limit is 1024 bytes.\nPlease use larger units or smaller values and try again!\n");
+                    continue;
                 }
                 buff[strcspn(buff,"\n")] = '\0';
                 printf("User input: %s\n",buff);
 
-                // TODO: Check if we need to double check to make sure the cgroup is actually frozen.
-                size_t new_max;
-
-                if (strcmp(buff, "kill") == 0) { // When the user type "kill"
-                    debug_printf("%s", "User choose to kill\n");
-                    char freeze_write[256];
-                    sprintf(freeze_write, "echo %d > %s", 1, freeze_path);
-                    usleep(0.05*1000*1000); // wait slightly to make sure freeze is set.
-
-                    FILE* file = fopen (procs_path, "r");
-                    int i = 0;
-
-                    fscanf (file, "%d", &i);    
-                    while (!feof (file)) {  
-                        debug_printf("Kill: %d \n", i);
-                        char pid_kill_write[256];
-                        sprintf(pid_kill_write, "kill %d", i);
-                        system(pid_kill_write);
-                        fscanf (file, "%d", &i);      
+                if (frozen == 0){
+                    if (strcmp(buff, "stop") == 0) {
+                        char freeze_write[256];
+                        sprintf(freeze_write, "echo %d > %s", 1, freeze_path);
+                        system(freeze_write);
+                        frozen = 1;
+                        printf( "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n");
+                        printf( "|Warning: cgroup is frozen. Proceed with 1 of the 3 options:                  |\n"
+                            "|1. Give a new memory.max: num[K,M,G], e.g., 20k, 30M                             |\n"
+                            "|2. Proceed:   Type \"continue\"                                                    |\n"
+                            "|3. Terminate: Type \"kill\"                                                        |\n"
+                            "|Please note: Proceeding without adding additional memory is not recommended.     |\n");
+                        printf( "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n");
                     }
-                    fclose (file);  
-                    break;
-                }
-                else if (strcmp(buff, "continue") == 0) { // When the user type "continue"
-                    debug_printf("%s", "User choose to continue\n");
-                    is_continue_no_freeze = 1;
-
-                    char pid_write[256];
-                    sprintf(pid_write, "echo %d > %s", 0, freeze_path);
-                    system(pid_write);
                     continue;
                 }
-                else if(parse_human_readable(buff, &new_max)) { // When the user type new memory size.
-                    debug_printf("%s", "User choose to allocate\n");
-                    // TODO: Check if inputted value is greater than initial memory.max
-                    int curr_cgroup_memory_max_val = -1;
-                    FILE *cgroup_memory_max_path_fptr = fopen(cgroup_memory_max_path, "r");
-                    if(cgroup_memory_max_path_fptr == NULL) {
-                        printf("Error! Could not open file\n");
-                    }
-                    fscanf(cgroup_memory_max_path_fptr, "%d", &curr_cgroup_memory_max_val);
-                    printf("New Max: %d, Orignal Max: %d\n", new_max, curr_cgroup_memory_max_val);
-                    if(new_max > curr_cgroup_memory_max_val) {
-                        max = new_max;
-                        high = (max-4096)*0.8;
-                        printf("New memory constraints: Max:%d, High:%d\n", max, high);
-                        sprintf(mem_high_write, "echo %d > %s", high, cgroup_memory_high_path);
-                        system(mem_high_write);
-                        sprintf(mem_max_write, "echo %d > %s", max, cgroup_memory_max_path);
-                        system(mem_max_write);
+                else{
+                    // TODO: Check if we need to double check to make sure the cgroup is actually frozen.
+                    // Invariant memory.current means the cgroup is actually frozen?
+                    size_t new_max;
 
-                        char unfreeze_write[256];
-                        sprintf(unfreeze_write, "echo %d > %s", 0, freeze_path);
-                        system(unfreeze_write);
+                    if (strcmp(buff, "kill") == 0) { // When the user type "kill"
+                        debug_printf("%s", "User choose to kill\n");
+                        char freeze_write[256];
+                        sprintf(freeze_write, "echo %d > %s", 1, freeze_path);
+                        usleep(0.05*1000*1000); // wait slightly to make sure freeze is set.
+
+                        FILE* file = fopen (procs_path, "r");
+                        int i = 0;
+
+                        fscanf (file, "%d", &i);    
+                        while (!feof (file)) {  
+                            debug_printf("Kill: %d \n", i);
+                            char pid_kill_write[256];
+                            sprintf(pid_kill_write, "kill %d", i);
+                            system(pid_kill_write);
+                            fscanf (file, "%d", &i);      
+                        }
+                        fclose (file);  
+                        break;
+                    }
+                    else if (strcmp(buff, "continue") == 0) { // When the user type "continue"
+                        debug_printf("%s", "User choose to continue\n");
+                        is_continue_no_freeze = 1;
+
+                        char pid_write[256];
+                        sprintf(pid_write, "echo %d > %s", 0, freeze_path);
+                        system(pid_write);
+                        frozen = 0;
                         continue;
                     }
-                    else{
-                        printf("Inputted memory size smaller than original "
-                        "memory given. Please input a larger value of allocated "
-                        "memory with the structure: num [k,M,G].\n");
+                    else if(parse_human_readable(buff, &new_max)) { // When the user type new memory size.
+                        debug_printf("%s", "User choose to allocate\n");
+                        // TODO: Check if inputted value is greater than initial memory.max
+                        int curr_cgroup_memory_max_val = -1;
+                        FILE *cgroup_memory_max_path_fptr = fopen(cgroup_memory_max_path, "r");
+                        if(cgroup_memory_max_path_fptr == NULL) {
+                            printf("Error! Could not open file\n");
+                        }
+                        fscanf(cgroup_memory_max_path_fptr, "%d", &curr_cgroup_memory_max_val);
+                        printf("New Max: %d, Orignal Max: %d\n", new_max, curr_cgroup_memory_max_val);
+                        if(new_max > curr_cgroup_memory_max_val) {
+                            max = new_max;
+                            high = (max-4096)*0.8;
+                            printf("New memory constraints: Max:%d, High:%d\n", max, high);
+                            sprintf(mem_high_write, "echo %d > %s", high, cgroup_memory_high_path);
+                            system(mem_high_write);
+                            sprintf(mem_max_write, "echo %d > %s", max, cgroup_memory_max_path);
+                            system(mem_max_write);
+
+                            char unfreeze_write[256];
+                            sprintf(unfreeze_write, "echo %d > %s", 0, freeze_path);
+                            system(unfreeze_write);
+                            frozen = 0;
+                            continue;
+                        }
+                        else{
+                            printf("Inputted memory size smaller than original "
+                            "memory given. Please input a larger value of allocated "
+                            "memory with the structure: num [K,M,G].\n");
+                        }
                     }
-                }
-                else { // When the user type something else.
-                    printf("Please input a valid command. Proceed with 1 of "
-                    "the 3 options: \n 1. Give a new memory.high: num [k,M,G]\n "
-                    "2. Proceed: continue\n 3. Terminate: kill\nPlease note: "
-                    "Proceeding without adding additional memory is not "
-                    "recommended.\n\n");
-                }
+                    else { // When the user type something else.
+                        printf("Please input a valid command. Proceed with 1 of "
+                        "the 3 options: \n 1. Give a new memory.high: num [K,M,G]\n "
+                        "2. Proceed: continue\n 3. Terminate: kill\nPlease note: "
+                        "Proceeding without adding additional memory is not "
+                        "recommended.\n\n");
+                    }
+                }   
             }
         }
     }
@@ -664,10 +791,38 @@ int main(int argc, char** argv) {
             }
     } while (!WIFEXITED(waitpid_status) && !WIFSIGNALED(waitpid_status));
 
+    
+    /////////////////////////////////////////////////////////////////////////////
+    // Terminate the thread of printing current memory usage and print out the 
+    // elapsed time of the test program
+    /////////////////////////////////////////////////////////////////////////////
+    
+    if(memory_current_flag == 1){
+        pthread_cancel(tid);
+    }
+
+    char info_cpu[1024] = {'\0'};
+    int fd_cpu = open(cgroup_cpu_stat_path, O_RDONLY); 
+    char buf_cpu[1024];
+    if (read(fd_cpu, buf_cpu, 1024) < 0) {
+        perror("Failed to read from cpu.stat.");
+        exit (EXIT_FAILURE);
+    }
+    lseek(fd_cpu, 0, SEEK_SET);
+    char *begin, *end;
+    begin = strchr(buf_cpu, 'u') + 10;
+    end = strchr(begin, '\n');
+    size_t len_info = end - begin + 1;
+    strncpy(info_cpu, begin, len_info);
+    int usage_usec = atoi(info_cpu);
+    printf("Elapsed time of the test program: %d microseconds.\n", usage_usec);
+
+
     /////////////////////////////////////////////////////////////////////////////
     // Remove the cgroup directory we created when this program endsRemove it 
     // in the end
     /////////////////////////////////////////////////////////////////////////////
+
     remove_cgroup_folder();
     // #ifdef __DEBUG__
     debug_printf("The directory %s removed\n", cgroup_dirname);

@@ -1,6 +1,6 @@
 
 CC=gcc
-CFLAGS=-g
+CFLAGS=-g -lpthread
 
 TARGET = resmanager
 
@@ -16,11 +16,12 @@ all: default tests
 $(TARGET): $(OBJ)
 	$(CC) $(CFLAGS) -o $@ $^ 
 
-tests: test_normal.c test_fork_bomb.c test_increase.c
+tests: test_normal.c test_fork_bomb.c test_increase.c parallel_dense_mm.c
 	$(CC) $(CFLAGS) -o test_normal test_normal.c
 	$(CC) $(CFLAGS) -o test_fork_bomb test_fork_bomb.c
 	$(CC) $(CFLAGS) -o test_increase test_increase.c
+	$(CC) $(CFLAGS) -o parallel_dense_mm parallel_dense_mm.c -fopenmp
 
 clean:
 	rm -f *.o
-	rm -f $(TARGET) test_increase test_fork_bomb test_normal
+	rm -f $(TARGET) test_increase test_fork_bomb test_normal parallel_dense_mm
