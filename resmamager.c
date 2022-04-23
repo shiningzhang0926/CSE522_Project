@@ -505,10 +505,10 @@ int main(int argc, char** argv) {
         system(cpu_weight_write);
     }
 
-    int period = 10000;
+    int period = 100000;
     int m = period * bandwidth;
     if (cpu_max_flag == 1){
-        sprintf(cpu_max_write, "echo %d %d > %s", max, period, cgroup_cpu_max_path);
+        sprintf(cpu_max_write, "echo %d %d > %s", m, period, cgroup_cpu_max_path);
         system(cpu_max_write);
     }
     
