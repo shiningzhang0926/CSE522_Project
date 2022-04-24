@@ -31,13 +31,14 @@ int mid_wrapper(void *arg) {
     #endif
     struct wrapper_args *args = (struct wrapper_args *) arg;
     char ch;
-    // Wait for the parent to put the pid of this process into the cgroup
     close(args->pipe_fd[1]);
+    close(args->stdio_pipe_fd[1]);
+    dup2(args->stdio_pipe_fd[0], 0);
+
+    // Wait for the parent to put the pid of this process into the cgroup
     if (read(args->pipe_fd[0], &ch, 1) != 0) {
         errExit("Failure in mid_wrapper: read from pipe returned != 0\n");
     }
-
-    // TODO: Make sure that the cgroup is in frozen state?
 
     #ifdef __DEBUG__ 
     debug_printf("%s", "[DEBUG: mid_wrapper] execvp.\n");

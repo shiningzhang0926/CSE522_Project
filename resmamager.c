@@ -41,17 +41,17 @@
 
 #define BUF_LEN 4096                        // Buffer size for the inotify events.
 #define STACK_SIZE (1024 * 1024)            // stack size of the child/wrapper.
+
 static char wrapper_stack[STACK_SIZE];      // the stack of the child/wrapper.
-
 static char *human_readable_suffix = "KMG"; // Units of memory sizes..
-int num_exceed = 0;                         // The last count of high in memory.events.
 static char *cgroup_dirname;                // The path to the cgroup that ResManager created.
-int frozen = 0;
+int         num_exceed  = 0;                         // The last count of high in memory.events.
+int         frozen      = 0;
 
-typedef struct{
+typedef struct {
     int t;
     char *path;
-}print_config;                              // The struct for printing the current memory usage
+} print_config;                              // The struct for printing the current memory usage
 
 /*
  * Function: print_needed_info
@@ -294,9 +294,9 @@ static void user_interrupt_handler(int dummy) {
  */
 
 size_t *parse_human_readable(char *input, size_t *target) {
-    char *endp = input;
-    char *match = NULL;
-    size_t shift = 0;
+    char   *endp  = input;
+    char   *match = NULL;
+    size_t shift  = 0;
     errno = 0;
 
     long double value = strtold(input, &endp);
@@ -412,9 +412,9 @@ int main(int argc, char** argv) {
         usage(argv[0]);
     }
 
-    /////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////
     // Set the path of the new cgroup
-    /////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////
     char dirname[128];
     char temp[128];
     char cgroup_memory_high_path[128];
@@ -466,9 +466,9 @@ int main(int argc, char** argv) {
     strcat(cgroup_cpu_max_path, cgroup_dirname);
     strcat(cgroup_cpu_max_path, "cpu.max");
 
-    /////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////
     // create a new cgroup directory
-    /////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////
     signal(SIGINT, user_interrupt_handler);
     check = mkdir(cgroup_dirname,0777);
     if (!check) {
@@ -479,10 +479,10 @@ int main(int argc, char** argv) {
         exit(EXIT_FAILURE);
     }
 
-    /////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////
     // Set resource limits what is high, max in memory 
     // and what is weight, bandwidth in cpu
-    /////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////
 
     // Write new values into memory.high, memory.max, cpu.weight and cpu.max files if the user inputs them.
     int high;
@@ -514,23 +514,36 @@ int main(int argc, char** argv) {
     
     printf("Initialize resouce limit successfully\n");
 
-    /////////////////////////////////////////////////////
-    /* Create the wrapper and put it into the procs */
-    /////////////////////////////////////////////////////
-    pid_t mid_wrapper_pid;
+    ////////////////////////////////////////////////////////////////////////////
+    /* 
+     * Create a pipe that will replace the child's stdin so that ResManager
+     * can select certain user inputs and make it the input to the child,
+     * i.e., the user program.
+    */
+    ////////////////////////////////////////////////////////////////////////////
     struct wrapper_args args;
+    int write_to_child_stdin;
+    if (pipe(args.stdio_pipe_fd) == -1) {
+        remove_cgroup_folder();
+        errExit("pipe");
+    }
+    
+    write_to_child_stdin = args.stdio_pipe_fd[1];
+    debug_printf("stdio pipe created. fd:[%d, %d]\n", args.stdio_pipe_fd[0], args.stdio_pipe_fd[1]);
+
+    ////////////////////////////////////////////////////////////////////////////
+    /* Create the wrapper (child) and put pid into the cgroup.procs
+     * (TODO: consider in new namespace(s)) 
+     */
+    ////////////////////////////////////////////////////////////////////////////
+    pid_t mid_wrapper_pid;
     args.argv = &argv[optind];   
 
     if (pipe(args.pipe_fd) == -1) {
         remove_cgroup_folder();
         errExit("pipe");
     }
-
-    /////////////////////////////////////////////////////
-    /* Create the child and put pid into the cgroup
-     *(TODO: consider in new namespace(s)) 
-     */
-    /////////////////////////////////////////////////////
+    debug_printf("sync pipe created. fd:[%d, %d]\n", args.pipe_fd[0], args.pipe_fd[1]);
 
     mid_wrapper_pid = clone(mid_wrapper, wrapper_stack + STACK_SIZE,
                        SIGCHLD, &args);
@@ -543,8 +556,8 @@ int main(int argc, char** argv) {
 
     // Put the pid of the child into the cgroup.procs
     
-    char *cgroup_procs = "cgroup.procs";
-    char *cgroup_memory_max = "memory.max";
+    char *cgroup_procs       = "cgroup.procs";
+    char *cgroup_memory_max  = "memory.max";
     char *cgroup_memory_stat = "memory.stat";
 
     size_t cgroup_path_len = 128;
@@ -564,9 +577,9 @@ int main(int argc, char** argv) {
     }
     debug_printf("Finish writing PID %lu of wrapper into %s\n", (long) mid_wrapper_pid, buf_path_cgroup_proc);
 
-    /////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////
     // Initialize the inotify monitor
-    /////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////
 
     int fd_inotify;
     fd_inotify = inotify_init1(0);
@@ -600,25 +613,25 @@ int main(int argc, char** argv) {
     nfds = 2;
     struct pollfd fds[20];
     /* Inotify events */
-    fds[0].fd = fd_inotify;                 
-    fds[0].events = POLLIN;
+    fds[0].fd       = fd_inotify;                 
+    fds[0].events   = POLLIN;
     /* Console input */
-    fds[1].fd = STDIN_FILENO;               
-    fds[1].events = POLLIN;
+    fds[1].fd       = STDIN_FILENO;               
+    fds[1].events   = POLLIN;
 
 
-    /////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////
     // Close the write end of the pipe so that the mid_wrapper can start the
     // the program.
-    /////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////
     printf("Program starts ... \n\nvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv\n");
     close(args.pipe_fd[1]);
 
 
-    /////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////
     // Create a new thread to print the current memory usgae of this child 
     // process periodically
-    /////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////
     pthread_t tid;
     print_config config;
     if(memory_current_flag == 1){
@@ -627,10 +640,10 @@ int main(int argc, char** argv) {
         pthread_create(&tid, NULL, &print_current_memory, &config);
     }
     
-    /////////////////////////////////////////////////////////////////////////////
-    // Check whether the child has returned with waitpid() and monitor user input and 
-    // cgroup events with inotify
-    /////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////
+    // Check whether the child has returned with waitpid() and monitor user 
+    // input and cgroup events with inotify
+    ////////////////////////////////////////////////////////////////////////////
 
     int waitpid_status, waitpid_status_temp;
     pid_t w, w_temp;
@@ -668,10 +681,20 @@ int main(int argc, char** argv) {
                     continue;
                 }
                 buff[strcspn(buff,"\n")] = '\0';
-                printf("User input: %s\n",buff);
+                printf("[ResManager] User input: %s\n", buff);
+                if (buff[0] == '#') {
+                    char* child_input = &buff[1];
+                    char newline_char = '\n';
+                    debug_printf("%s: %s\n", "User input to the child", child_input);
+                    printf("[ResManager] Forwarding \"%s\" to %s\n", child_input, args.argv[0]);
+                    write(write_to_child_stdin, child_input, num_read-2);   // -2 because we have removed # and need to remove the \0 in the end.
+                    write(write_to_child_stdin, &newline_char, 1);          // write a \n to the stdin of the child to simulate the user's hitting the enter.
+                    continue;
+                }
 
-                if (frozen == 0){
+                if (frozen == 0) {
                     if (strcmp(buff, "stop") == 0) {
+                        debug_printf("%s", "User pauses the execution.\n");
                         char freeze_write[256];
                         sprintf(freeze_write, "echo %d > %s", 1, freeze_path);
                         system(freeze_write);
@@ -732,7 +755,7 @@ int main(int argc, char** argv) {
                         fscanf(cgroup_memory_max_path_fptr, "%d", &curr_cgroup_memory_max_val);
                         printf("New Max: %d, Orignal Max: %d\n", new_max, curr_cgroup_memory_max_val);
                         if(new_max > curr_cgroup_memory_max_val) {
-                            max = new_max;
+                            max  = new_max;
                             high = (max-4096)*0.8;
                             printf("New memory constraints: Max:%d, High:%d\n", max, high);
                             sprintf(mem_high_write, "echo %d > %s", high, cgroup_memory_high_path);
@@ -764,10 +787,10 @@ int main(int argc, char** argv) {
         }
     }
 
-    /////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////
     // Wait for the child process to finish and report the return value or 
     // errors from the child.
-    /////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////
     #ifdef __DEBUG__
     debug_printf("%s", "out of while\n");
     #endif
@@ -792,10 +815,10 @@ int main(int argc, char** argv) {
     } while (!WIFEXITED(waitpid_status) && !WIFSIGNALED(waitpid_status));
 
     
-    /////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////
     // Terminate the thread of printing current memory usage and print out the 
     // elapsed time of the test program
-    /////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////
     
     if(memory_current_flag == 1){
         pthread_cancel(tid);
@@ -815,18 +838,17 @@ int main(int argc, char** argv) {
     size_t len_info = end - begin + 1;
     strncpy(info_cpu, begin, len_info);
     int usage_usec = atoi(info_cpu);
+    printf("[ResManager] ");
     printf("Elapsed time of the test program: %d microseconds.\n", usage_usec);
 
 
-    /////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////
     // Remove the cgroup directory we created when this program endsRemove it 
     // in the end
-    /////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////
 
     remove_cgroup_folder();
-    // #ifdef __DEBUG__
     debug_printf("The directory %s removed\n", cgroup_dirname);
-    // #endif
     printf("[ResManager] ResManager exits.\n");
     exit(EXIT_SUCCESS);
 }

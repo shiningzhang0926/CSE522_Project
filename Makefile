@@ -21,6 +21,7 @@ tests: test_normal.c test_fork_bomb.c test_increase.c parallel_dense_mm.c
 	$(CC) $(CFLAGS) -o test_fork_bomb test_fork_bomb.c
 	$(CC) $(CFLAGS) -o test_increase test_increase.c
 	$(CC) $(CFLAGS) -o parallel_dense_mm parallel_dense_mm.c -fopenmp
+	$(CC) $(CFLAGS) -o test_input_fwd test_input_fwd.c
 
 clean:
 	rm -f *.o

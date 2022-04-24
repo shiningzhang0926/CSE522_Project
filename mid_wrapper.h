@@ -34,9 +34,10 @@
 #include <stdlib.h>
 
 struct wrapper_args {
-    char **argv;        /* Command to be executed by child, with arguments */
+    char **argv;            // Command to be executed by child, with arguments
     char *cgroup_path;
-    int    pipe_fd[2];  /* Pipe used to synchronize parent and child */
+    int  pipe_fd[2];        // Pipe used to synchronize parent and child
+    int  stdio_pipe_fd[2];  // Pipe used to synchronize parent and child
 };
 
 int mid_wrapper(void *arg);
