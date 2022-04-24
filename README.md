@@ -16,7 +16,7 @@ By issuing,
 ```
 mount | grep cgroup
 ```
-You should find something like,
+make sure that `cgroup2` appears in the output,
 ```
 cgroup2 on /sys/fs/cgroup type cgroup2 (rw,nosuid,nodev,noexec,relatime,nsdelegate)
 ```
@@ -38,11 +38,42 @@ make clean && make
 
 ## Usage and Tests
 
-**Note that you need SUDO permission to run the ResManager**
+### `cgroup` configuration
+**Note that you need SUDO permission for the configuration**
+After every system reboot, run ***(this only needs to be run once)**
+```
+source ./init_cgroup.sh
+```
+In every newly created terminal, run ***(this needs to be run in every new terminal)**
+```
+source ./init_resmanager.sh
+```
 
+
+### Command-line Options
+`./resmanager [-mtwb|args] ./user_program [user_program_option]`
+* `-m`:
+* `-t`:
+* `-w`:
+* `-b`:
+
+### Interactive Commands
+When the user program in running:
+* `pasue`, `p`: Pause the execution
+
+When the user program in frozen state (run `pasue` to make user program into frozen state):
+* `continue`, `c`:
+* `kill`, `k`:
+* `num[K,M,G]`:
+
+User input forwarding: 
+* `#`USERINPUT: Use `#` as the 
+
+### Example
+### 0. To run a program with memory constraints
 To run a simple test that allocate 40KB of memory 50 times with ResManager:
 ```
-sudo ./resmanager -m 200 -u KB ./test_increase
+sudo ./resmanager -m 200KB ./test_increase
 ```
 The expected output in the terminal will be:
 ```
@@ -55,7 +86,7 @@ Allocate #0 40KB
 Allocate #1 40KB
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 |Warning: Exceeded memory.high. Proceed with 1 of the 3 options:                  |
-|1. Give a new memory.max: num[k,M,G], e.g., 20k, 30M                             |
+|1. Give a new memory.max: num[K,M,G], e.g., 20k, 30M                             |
 |2. Proceed:   Type "continue"                                                    |
 |3. Terminate: Type "kill"                                                        |
 |Please note: Proceeding without adding additional memory is not recommended.     |
