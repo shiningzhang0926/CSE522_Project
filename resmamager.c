@@ -428,7 +428,7 @@ int main(int argc, char** argv) {
     int check;
     int pid = getpid();
     memset(dirname, '\0', 128);
-    strcat(dirname, "/sys/fs/cgroup/resmanager_cgroup_");
+    strcat(dirname, "/sys/fs/cgroup/resmanager/resmanager_cgroup_");
     sprintf(temp, "%d/", pid);
     strcat(dirname, temp);
 
@@ -693,8 +693,8 @@ int main(int argc, char** argv) {
                 }
 
                 if (frozen == 0) {
-                    if (strcmp(buff, "stop") == 0) {
-                        debug_printf("%s", "User pauses the execution.\n");
+                    if (strcmp(buff, "pause")==0 || strcmp(buff, "p")==0) {
+                        debug_printf("%s: freeze-> %s\n", "User pauses the execution.", freeze_path);
                         char freeze_write[256];
                         sprintf(freeze_write, "echo %d > %s", 1, freeze_path);
                         system(freeze_write);
@@ -714,7 +714,7 @@ int main(int argc, char** argv) {
                     // Invariant memory.current means the cgroup is actually frozen?
                     size_t new_max;
 
-                    if (strcmp(buff, "kill") == 0) { // When the user type "kill"
+                    if (strcmp(buff, "kill")==0 || strcmp(buff, "k")==0) { // When the user type "kill"
                         debug_printf("%s", "User choose to kill\n");
                         char freeze_write[256];
                         sprintf(freeze_write, "echo %d > %s", 1, freeze_path);
@@ -734,7 +734,7 @@ int main(int argc, char** argv) {
                         fclose (file);  
                         break;
                     }
-                    else if (strcmp(buff, "continue") == 0) { // When the user type "continue"
+                    else if (strcmp(buff, "continue")==0 || strcmp(buff, "c")==0) { // When the user type "continue"
                         debug_printf("%s", "User choose to continue\n");
                         is_continue_no_freeze = 1;
 
