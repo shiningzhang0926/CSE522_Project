@@ -341,7 +341,7 @@ void* print_current_memory (void *arg){
             perror("Failed to read from memory.current.");
             exit (EXIT_FAILURE);
         }
-        if(atoi(buf) > temp){
+        if(atoi(buf) != temp){
             printf("Current Memory Usage (bytes): %s", buf);
             temp = atoi(buf);
         }
