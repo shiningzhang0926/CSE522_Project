@@ -22,24 +22,24 @@ cgroup2 on /sys/fs/cgroup type cgroup2 (rw,nosuid,nodev,noexec,relatime,nsdelega
 ```
 Otherwise, change you cgroup version to v2.
 
-### Enable the memory controller in the cgroup.subtree_control
+<!-- ### Enable the memory controller in the cgroup.subtree_control
 Issue the following command to ensure that the memory controller is enabled in the cgroup controllers.
 ```
 sudo echo "+memory" > cgroup.subtree_control
-```
-## Install
-**Note that you need SUDO permission to run the ResManager**
+``` -->
 
+
+## Install
+
+### make
 To install the resmanager and all the test files, run:
 ```
 make clean && make
 ```
 
-
-## Usage and Tests
-
 ### `cgroup` configuration
 **Note that you need SUDO permission for the configuration**
+
 After every system reboot, run ***(this only needs to be run once)**
 ```
 source ./init_cgroup.sh
@@ -50,27 +50,31 @@ source ./init_resmanager.sh
 ```
 
 
+## Usage
+
 ### Command-line Options
+You may use the resmanager with the following syntax: 
+
 `./resmanager [-mtwb|args] ./user_program [user_program_option]`
-* `-m`:
+* `-m`: 
 * `-t`:
 * `-w`:
 * `-b`:
 
 ### Interactive Commands
-When the user program in running:
-* `pasue`, `p`: Pause the execution
+1. When the user program is running, the user may pause the execution:
+    * `pasue`, `p`: Pause the execution. This makes the `cgroup` in frozen state.
 
-When the user program in frozen state (run `pasue` to make user program into frozen state):
-* `continue`, `c`:
-* `kill`, `k`:
-* `num[K,M,G]`:
+2. When the user program is in frozen state (You may run `pasue` to make user program into frozen state), the user has the following options to allow the ResManager to proceed: 
+    * `continue`, `c`:
+    * `kill`, `k`:
+    * `num[K,M,G]`:
 
-User input forwarding: 
-* `#`USERINPUT: Use `#` as the 
+3. In case the user program needs user input from the terminal:
+    * `#`USERINPUT: Use `#` to indicate the ResManager that the characters followed should be forwarded to the user program, including the newline character.
 
-### Example
-### 0. To run a program with memory constraints
+## Example
+### 1. To run a program with memory constraints
 To run a simple test that allocate 40KB of memory 50 times with ResManager:
 ```
 sudo ./resmanager -m 200KB ./test_increase
@@ -95,7 +99,7 @@ Allocate #1 40KB
 The box at the end of the output indicated that the current memory exceeded the memory.high and a new memory allocation is (possibly) needed to allow the test program to finish properly.
 
 Now the user has three options to continue the execution:
-### 1. Allocate more memory
+### 2. Allocate more memory
 The user may type a memory size in the format of `num[K,M,G]`, e.g., `20K`, `30M`, and press "Enter" in the terminal to allocate more memory for the `memory.max` (`memory.high` will be adjusted accordingly to the predefined ratio to `memory.max`.). The test program will continue to execute with more memory allocated.
 
 Note that the ResManager may freeze the execution again if the memory exceeds
@@ -116,7 +120,7 @@ Allocate #49 40KB
 [ResManager] Program (./test_increase) exited, status=0
 [ResManager] ResManager exits.
 ```
-### 2. Continue the execution
+### 3. Continue the execution
 The user may type `continue` to allow the program to continue without additional memory. In this case the freezer will be disabled. The test program may finish properly to be killed by the OOM killer in the cgroup.
 
 For example, you may receive the following message when the OOM killer in invoked:
@@ -130,7 +134,7 @@ Allocate #11 40KB
 [ResManager] Program (./test_increase) killed by signal 9
 [ResManager] ResManager exits.
 ```
-### 3. Kill the test program
+### 4. Kill the test program
 The user may type `kill` to kill the test program directly. ResManager will kill all the child process in the cgroup and clear up the cgroup created.
 
 For example, you may receive the following message when you tyoe `kill` in the terminal:
@@ -140,7 +144,7 @@ User input: kill
 [ResManager] ResManager exits.
 ```
 
-### (TODO) 4. Request for statistics
+### (TODO) 5. Request for statistics
 We will add another option to allow the user to request the current memory usage and print the statistics in the terminal. 
 
 ## Authors
