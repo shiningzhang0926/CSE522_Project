@@ -56,10 +56,10 @@ source ./init_resmanager.sh
 You may use the resmanager with the following syntax: 
 
 `./resmanager [-mtwb|args] ./user_program [user_program_option]`
-* `-m`: Set the maximum amount of memory the user program can use by a number plus unit (K,M,G) like 100K, 10M, etc. The default value is MAX.
-* `-t`: Set the time interval of printing current memory usage by a number in seconds. The default value is no output.
-* `-w`: Set the weight of CPU by an integer that ranges from 1 to 10000. The default value is 100.
-* `-b`: Set the bandwidth of CPU by a decimal that ranges from 0 to 1. The default value is MAX.
+* `-m num[KMG]`: Set the maximum amount of memory the user program can use by a number plus unit (K,M,G) like 100K, 10M, etc. The default value is MAX.
+* `-t seconds(int)`: Set the time interval of printing current memory usage by a number in seconds. (Integer only, because we used `sleep()`.) The default value is no output.
+* `-w weight`: Set the weight of CPU by an integer that ranges from 1 to 10000. The default value is 100.
+* `-b bandwidth`: Set the bandwidth of CPU by a decimal that ranges from 0 to 1. The default value is MAX.
 
 ### Interactive Commands
 1. When the user program is running, the user may pause the execution:
