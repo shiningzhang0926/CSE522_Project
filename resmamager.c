@@ -383,8 +383,11 @@ int main(int argc, char** argv) {
                 }
             case 't': 
                 t = atoi(optarg); 
-                if (t != 0){
+                if (t > 0){
                     memory_current_flag = 1;
+                }
+                else{
+                    usage(argv[0]);
                 }
                 break;
             case 'w':
