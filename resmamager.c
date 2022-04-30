@@ -232,7 +232,7 @@ static void usage(char *program_name) {
     fprintf(stderr, "    %s", "-m: The maximum amount of memory we want to allocate at the beginning and arg1 should look like xxx[K,M,G]\n");
     fprintf(stderr, "    %s", "-t: The time interval of printing current memory usage and arg2 should be a number in seconds\n");
     fprintf(stderr, "    %s", "-w: The weight of cpu we want to set and arg3 should be a number from 1 to 10000\n");
-    fprintf(stderr, "    %s", "-b: The bandwidth of cpu we want to set and arg4 should be a number from 0 to 1\n");
+    fprintf(stderr, "    %s", "-b: The bandwidth of cpu we want to set and arg4 should be a number from 0 to 4\n");
     exit(EXIT_FAILURE);
 }
 
@@ -401,8 +401,8 @@ int main(int argc, char** argv) {
                 break;
             case 'b':
                 bandwidth = atof(optarg);
-                if(bandwidth <= 0 || bandwidth > 1){
-                    printf("Warning: CPU's bandwidth only can range from 0-1\n.");
+                if(bandwidth <= 0 || bandwidth > 4){
+                    printf("Warning: CPU's bandwidth only can range from 0-4\n.");
                     usage(argv[0]);
                     exit(EXIT_FAILURE);
                 }
