@@ -95,6 +95,8 @@ Allocate #1 40KB
 |3. Terminate: Type "kill"                                                        |
 |Please note: Proceeding without adding additional memory is not recommended.     |
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+Current value of memory.high in bytes: 159744
+Current value of memory.max in bytes: 204800
 ```
 The box at the end of the output indicated that the current memory exceeded the memory.high and a new memory allocation is (possibly) needed to allow the test program to finish properly.
 

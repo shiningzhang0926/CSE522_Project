@@ -342,12 +342,47 @@ void* print_current_memory (void *arg){
             exit (EXIT_FAILURE);
         }
         if(atoi(buf) != temp){
-            printf("Current Memory Usage (bytes): %s", buf);
+            printf("Current Memory Usage in bytes: %s", buf);
             temp = atoi(buf);
         }
         close(fd);
     }
     
+}
+
+/*
+ * Function: print_high_max
+ * ----------------------------
+ * It is a function that get the path of memory.high and memory.max from the main function, 
+ * and print out the current values of them when the cgroup is frozen.
+ * 
+ * Params:
+ * arg: The path of memory.high and memory.max files
+ * 
+ * returns: none
+ */
+
+static void print_high_max(char *high_path, char *max_path){
+    int fd_high, fd_max;
+    fd_high = open(high_path, O_RDONLY);
+    fd_max = open(max_path, O_RDONLY);
+    char *buf_high[1024], *buf_max[1024];
+    if (read(fd_high, buf_high, 1024) < 0) {
+            perror("Failed to read from memory.high.");
+            exit (EXIT_FAILURE);
+    }
+    else{
+        printf("Current value of memory.high in bytes: %s", buf_high);
+        close(fd_high);
+    }
+    if (read(fd_max, buf_max, 1024) < 0) {
+            perror("Failed to read from memory.max.");
+            exit (EXIT_FAILURE);
+    }
+    else{
+        printf("Current value of memory.max in bytes: %s", buf_max);
+        close(fd_max);
+    }
 }
 
 
@@ -674,6 +709,9 @@ int main(int argc, char** argv) {
             if (fds[0].revents & POLLIN & is_continue_no_freeze == 0) {
                 debug_printf("%s", "poll 0\n");
                 inotify_event_handler(fd_inotify, file_names, cgroup_file_fds, cgroup_file_inotify_fds);
+                if (frozen == 1){
+                    print_high_max(cgroup_memory_high_path, cgroup_memory_max_path);
+                }
             }
             else if (fds[1].revents & POLLIN) {
                 debug_printf("%s", "poll 1\n");
@@ -709,6 +747,7 @@ int main(int argc, char** argv) {
                             "|3. Terminate: Type \"kill\"                                                        |\n"
                             "|Please note: Proceeding without adding additional memory is not recommended.     |\n");
                         printf( "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n");
+                        print_high_max(cgroup_memory_high_path, cgroup_memory_max_path);
                     }
                     continue;
                 }
