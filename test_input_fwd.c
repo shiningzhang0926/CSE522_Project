@@ -1,8 +1,8 @@
 /*
  * test_input_fwd.c
  * ----------------------------
- * A simple test program that ask the user to input an integer and print the 
- * integer on the screen.
+ * A simple test program that ask the user to input something and print the 
+ * exact same content on the screen.
  * 
  * Authors: Ruiqi Wang, Shining Zhang, William Hsaio
  */
