@@ -73,7 +73,7 @@ You may use the resmanager with the following syntax:
 3. In case the user program needs user input from the terminal:
     * `#`USERINPUT: Use `#` to indicate the ResManager that the characters followed should be forwarded to the user program, including the newline character.
 
-## Example
+## Examples
 ### 1. To run a program with memory constraints
 To run a simple test that allocate 40KB of memory 50 times with ResManager:
 ```
